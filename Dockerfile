@@ -29,4 +29,4 @@ EXPOSE 80
 WORKDIR /webserver-root/
 RUN ls -alshp
 
-ENTRYPOINT ["/bin/webserver"]
+ENTRYPOINT ["/bin/bash", "-c", "cd /webserver-root/; /bin/webserver"]

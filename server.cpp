@@ -60,8 +60,6 @@ inline void handle_index_html(struct mg_connection* connection, struct mg_http_m
 
 inline void handle_favicon_html(struct mg_connection* connection, struct mg_http_message* msg);
 
-inline void handle_file_html(struct mg_connection* connection, struct mg_http_message* msg);
-
 inline void handle_dir_html(struct mg_connection* connection, struct mg_http_message* msg);
 
 
@@ -72,9 +70,7 @@ inline void handle_http_message(struct mg_connection* connection, struct mg_http
 		handle_index_html(connection, msg);
 	else if (mg_http_match_uri(msg, "/favicon.ico") || mg_http_match_uri(msg, "/favicon"))
 		handle_favicon_html(connection, msg);
-	else if (starts_with(msg->uri.ptr, "/file"))
-		handle_file_html(connection, msg);
-	else if (starts_with(msg->uri.ptr, "/dir"))
+	else if (starts_with(msg->uri.ptr, "/dir/"))
 		handle_dir_html(connection, msg);
 	else send_error_html(connection, 404, "rgba(147, 0, 0, 0.90)");
 }
@@ -142,47 +138,9 @@ inline void handle_favicon_html(struct mg_connection* connection, struct mg_http
 }
 
 
-inline void handle_file_html(struct mg_connection* connection, struct mg_http_message* msg)
-{
-	std::string path;
-	
-	char* uri = new char[msg->uri.len + 1];
-	strncpy(uri, msg->uri.ptr, msg->uri.len);
-	uri[msg->uri.len] = 0;
-	
-	::strscanf(uri, "/file/%s", &path);
-	
-	delete[] uri;
-	
-	std::string spath(secure_path(path));
-	
-	if (!spath.starts_with('/')) spath = "/" + spath;
-	spath = getcwd() + spath;
-	
-	struct stat st{ };
-	if (::stat(spath.c_str(), &st) == 0 && !S_ISDIR(st.st_mode))
-	{
-		struct mg_http_serve_opts opts{ };
-		std::string extra_header;
-		
-		if (st.st_size > MAX_INLINE_FILE_SIZE)
-		{
-			extra_header = "Content-Disposition: attachment; filename=\"";
-			extra_header += path_basename(spath.c_str());
-			extra_header += "\"\r\n";
-			
-			opts.extra_headers = extra_header.c_str();
-		}
-		
-		mg_http_serve_file(connection, msg, spath.c_str(), &opts);
-	}
-	else send_error_html(connection, 404, "rgba(147, 0, 0, 0.90)");
-}
-
-
 inline void handle_dir_html(struct mg_connection* connection, struct mg_http_message* msg)
 {
-	std::string path;
+	char* path = nullptr;
 	
 	char* uri = new char[msg->uri.len + 1];
 	strncpy(uri, msg->uri.ptr, msg->uri.len);
@@ -190,15 +148,18 @@ inline void handle_dir_html(struct mg_connection* connection, struct mg_http_mes
 	
 	::strscanf(uri, "/dir/%s", &path);
 	
-	delete[] uri;
+	std::string strpath(path ? path : "");
 	
-	std::string spath(secure_path(path));
+	delete[] uri;
+	delete[] path;
+	
+	std::string spath(secure_path(strpath));
 	
 	if (!spath.starts_with('/')) spath = "/" + spath;
-	spath = getcwd() + spath;
+	std::string spath_full(getcwd() + spath);
 	
 	struct stat st{ };
-	if (::stat(spath.c_str(), &st) == 0 && S_ISDIR(st.st_mode))
+	if (::stat(spath_full.c_str(), &st) == 0)
 	{
 		struct mg_http_serve_opts opts{ .root_dir = getcwd() };
 		std::string extra_header;
@@ -212,15 +173,12 @@ inline void handle_dir_html(struct mg_connection* connection, struct mg_http_mes
 			opts.extra_headers = extra_header.c_str();
 		}
 		
-		std::string msgstrcp(msg->message.ptr, msg->uri.ptr + msg->uri.len);
-		msgstrcp.erase(
-				msgstrcp.begin() + (msg->uri.ptr - msg->message.ptr),
-				msgstrcp.begin() + (msg->uri.ptr - msg->message.ptr) + 4
-		);
+		std::string msgstrcp(msg->message.ptr, msg->uri.ptr);
+		msgstrcp += spath;
 		
 		struct mg_http_message msg2{ };
 		msg2.message = mg_str_n(msgstrcp.data(), msgstrcp.size());
-		msg2.uri = mg_str_n(msg2.message.ptr + (msg->uri.ptr - msg->message.ptr), msg->uri.len - 4);
+		msg2.uri = mg_str_n(msg2.message.ptr + (msg->uri.ptr - msg->message.ptr), spath.size());
 		msg2.method = msg->method;
 		msg2.query = msg->query;
 		msg2.proto = msg->proto;
