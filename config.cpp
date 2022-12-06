@@ -13,4 +13,12 @@
 void register_additional_handlers()
 {
 	// TODO: Create your handlers here
+	// Template :
+	// register_path_handler(
+	// 		"PATH", "DESCRIPTION",
+	// 		[](struct mg_connection* connection, struct mg_http_message* msg)
+	// 		{
+	//
+	// 		}
+	// );
 }

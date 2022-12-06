@@ -41,6 +41,7 @@ typedef struct
 typedef struct
 {
 	std::string path;
+	std::string description;
 	path_handler_function fn;
 } registered_path_handler;
 
@@ -92,18 +93,21 @@ inline void handle_dir_html(struct mg_connection* connection, struct mg_http_mes
 
 
 /// Add path handler to global linked list
-void register_path_handler(const std::string& path, path_handler_function fn)
+void register_path_handler(const std::string& path, const std::string& description, path_handler_function fn)
 {
 	if (!handlers_head)
 	{
 		delete handlers;
-		handlers = new registered_path_handlers{ .data = new registered_path_handler{ .path = path, .fn = fn }, .next = nullptr };
+		handlers = new registered_path_handlers{
+				.data = new registered_path_handler{ .path = path, .description = description, .fn = fn },
+				.next = nullptr };
 		handlers_head = handlers;
 	}
 	else
 	{
-		handlers_head->next =
-				new registered_path_handlers{ .data = new registered_path_handler{ .path = path, .fn = fn }, .next = nullptr };
+		handlers_head->next = new registered_path_handlers{
+				.data = new registered_path_handler{ .path = path, .description = description, .fn = fn },
+				.next = nullptr };
 		handlers_head = handlers_head->next;
 	}
 }
@@ -188,9 +192,20 @@ void server_run()
 
 inline void handle_index_html(struct mg_connection* connection, struct mg_http_message* msg)
 {
+	size_t accumulate = 0, count = 0;
+	std::string appendix;
+	for (auto* i = handlers; i != nullptr && i->data != nullptr;
+	     accumulate += i->data->path.size() + i->data->description.size(), ++count, i = i->next)
+	{
+		appendix += "<li><a href=\"" + i->data->path + "\">" + i->data->description + "</a></li>\n";
+	}
+	
+	char article_complete[article_html_len + count * 20 + accumulate + 1];
+	sprintf(article_complete, reinterpret_cast<const char*>(article_html), appendix.c_str());
+	
 	mg_http_reply(
-			connection, 200, "Content-Type: text/html\r\n", reinterpret_cast<const char*>(index_html),
-			reinterpret_cast<const char*>(article_html)
+			connection, 200, "Content-Type: text/html\r\n",
+			reinterpret_cast<const char*>(index_html), article_complete
 	);
 }
 

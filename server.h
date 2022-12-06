@@ -21,6 +21,6 @@ extern void server_run();
 
 typedef void (* path_handler_function)(struct mg_connection* connection, struct mg_http_message* msg);
 
-extern void register_path_handler(const std::string& path, path_handler_function fn);
+extern void register_path_handler(const std::string& path, const std::string& description, path_handler_function fn);
 
 #endif //WEBSERVER_SERVER_H
