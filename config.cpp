@@ -5,13 +5,12 @@
 // Commercial usage must be agreed with the author of this comment.
 
 
-#ifndef FILESTORAGE_ZIP_DIR_H
-#define FILESTORAGE_ZIP_DIR_H
-
-#include <string>
+#include "server.h"
+#include "config.h"
 
 
-extern void zip_directory(const std::string& directory, const std::string& output_zip_file);
-
-
-#endif //FILESTORAGE_ZIP_DIR_H
+/// Register user-defined path handlers
+void register_additional_handlers()
+{
+	// TODO: Create your handlers here
+}

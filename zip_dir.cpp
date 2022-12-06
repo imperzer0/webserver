@@ -20,6 +20,7 @@ static bool is_dir(const std::string& dir)
 	return S_ISDIR(st.st_mode);
 }
 
+/// Recursively walk through directory tree and add everything to zip archive
 static void walk_directory(const std::string& startdir, const std::string& inputdir, zip_t* zipper)
 {
 	DIR* dp = ::opendir(inputdir.c_str());
@@ -58,20 +59,21 @@ static void walk_directory(const std::string& startdir, const std::string& input
 	::closedir(dp);
 }
 
-void zip_directory(const std::string& inputdir, const std::string& output_filename)
+/// Create zip archive of whole directory
+void zip_directory(const std::string& directory, const std::string& output_zip_file)
 {
 	int errorp;
-	zip_t* zipper = zip_open(output_filename.c_str(), ZIP_CREATE | ZIP_EXCL, &errorp);
+	zip_t* zipper = zip_open(output_zip_file.c_str(), ZIP_CREATE | ZIP_EXCL, &errorp);
 	if (zipper == nullptr)
 	{
 		zip_error_t ziperror;
 		zip_error_init_with_code(&ziperror, errorp);
-		throw std::runtime_error("Failed to open output file " + output_filename + ": " + zip_error_strerror(&ziperror));
+		throw std::runtime_error("Failed to open output file " + output_zip_file + ": " + zip_error_strerror(&ziperror));
 	}
 	
 	try
 	{
-		walk_directory(inputdir, inputdir, zipper);
+		walk_directory(directory, directory, zipper);
 	}
 	catch (...)
 	{

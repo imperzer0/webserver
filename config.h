@@ -5,13 +5,9 @@
 // Commercial usage must be agreed with the author of this comment.
 
 
-#ifndef FILESTORAGE_ZIP_DIR_H
-#define FILESTORAGE_ZIP_DIR_H
+#ifndef WEBSERVER_CONFIG_H
+#define WEBSERVER_CONFIG_H
 
-#include <string>
+extern void register_additional_handlers();
 
-
-extern void zip_directory(const std::string& directory, const std::string& output_zip_file);
-
-
-#endif //FILESTORAGE_ZIP_DIR_H
+#endif //WEBSERVER_CONFIG_H

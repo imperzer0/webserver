@@ -11,6 +11,7 @@
 #include "strscan.c"
 #include "resources.hpp"
 #include "zip_dir.h"
+#include "config.h"
 
 
 const char* address = DEFAULT_SERVER_ADDRESS;
@@ -37,30 +38,89 @@ typedef struct
 } str_buf_fd;
 
 
+typedef struct
+{
+	std::string path;
+	path_handler_function fn;
+} registered_path_handler;
 
-inline int starts_with(const char* str, const char* prefix);
+typedef struct __registered_path_handlers
+{
+	registered_path_handler* data = nullptr;
+	struct __registered_path_handlers* next = nullptr;
+} registered_path_handlers;
 
+static registered_path_handlers* handlers = nullptr;
+static registered_path_handlers* handlers_head = nullptr;
+
+
+/// Return true if str starts with prefix
+inline bool starts_with(const char* str, const char* prefix);
+
+/// Get current working directory
 inline char* getcwd();
 
+/// Erase all seq occurrences in str
 inline std::string erase_all(const std::string& str, const std::string& seq);
 
+/// Remove .. subdirectories from path to prevent sandbox escape
 inline std::string secure_path(const std::string& path);
 
+/// Get parent directory name of entry at given path
 inline char* path_dirname(const char* path);
 
+/// Get entry base name
 inline const char* path_basename(const char* path);
 
 
+/// Send resource string as regular file over http
 inline void http_send_resource_file(struct mg_connection* connection, struct mg_http_message* msg, const char* rcdata, size_t rcsize);
 
+/// Send error page over http
 inline void send_error_html(struct mg_connection* connection, int code, const char* color);
 
 
+/// Handle index page access
 inline void handle_index_html(struct mg_connection* connection, struct mg_http_message* msg);
 
+/// Handle favicon access
 inline void handle_favicon_html(struct mg_connection* connection, struct mg_http_message* msg);
 
+/// Handle filesystem access (serve directory)
 inline void handle_dir_html(struct mg_connection* connection, struct mg_http_message* msg);
+
+
+
+/// Add path handler to global linked list
+void register_path_handler(const std::string& path, path_handler_function fn)
+{
+	if (!handlers_head)
+	{
+		delete handlers;
+		handlers = new registered_path_handlers{ .data = new registered_path_handler{ .path = path, .fn = fn }, .next = nullptr };
+		handlers_head = handlers;
+	}
+	else
+	{
+		handlers_head->next =
+				new registered_path_handlers{ .data = new registered_path_handler{ .path = path, .fn = fn }, .next = nullptr };
+		handlers_head = handlers_head->next;
+	}
+}
+
+/// Iterate through registered handlers and try handle them
+inline void handle_registered_paths(struct mg_connection* connection, struct mg_http_message* msg)
+{
+	registered_path_handlers* root = handlers;
+	
+	while (root && root->data && !starts_with(msg->uri.ptr, root->data->path.c_str()))
+		root = root->next;
+	
+	if (root && root->data)
+		return root->data->fn(connection, msg);
+	
+	send_error_html(connection, 404, "rgba(147, 0, 0, 0.90)");
+}
 
 
 
@@ -72,11 +132,12 @@ inline void handle_http_message(struct mg_connection* connection, struct mg_http
 		handle_favicon_html(connection, msg);
 	else if (starts_with(msg->uri.ptr, "/dir/"))
 		handle_dir_html(connection, msg);
-	else send_error_html(connection, 404, "rgba(147, 0, 0, 0.90)");
+	else handle_registered_paths(connection, msg);
 }
 
 
 
+/// Handle mongoose events
 void client_handler(struct mg_connection* connection, int ev, void* ev_data, void* fn_data)
 {
 	if (ev == MG_EV_HTTP_MSG)
@@ -86,6 +147,7 @@ void client_handler(struct mg_connection* connection, int ev, void* ev_data, voi
 	}
 }
 
+/// Initialize server
 void server_initialize()
 {
 	signal(SIGINT, signal_handler);
@@ -94,9 +156,10 @@ void server_initialize()
 	mg_log_set(log_level);
 	mg_mgr_init(&manager);
 	
-	//	config_initialization_thread();
+	register_additional_handlers();
 }
 
+/// Start listening on given address and run server loop
 void server_run()
 {
 	if (!(server_connection = mg_http_listen(&manager, address, client_handler, nullptr)))
@@ -202,7 +265,7 @@ inline static consteval size_t static_strlen(const char* str)
 	return len;
 }
 
-inline int starts_with(const char* str, const char* prefix)
+inline bool starts_with(const char* str, const char* prefix)
 {
 	for (; *prefix; ++prefix, ++str)
 		if (*prefix != *str)

@@ -73,6 +73,6 @@ message(" [ compiler ]  ${CMAKE_CXX_COMPILER}_${CMAKE_CXX_STANDARD} ${CMAKE_CXX_
 
 set(CMAKE_VERBOSE_MAKEFILE on)
 
-add_executable(webserver main.cpp server.cpp zip_dir.cpp)
+add_executable(webserver main.cpp server.cpp zip_dir.cpp config.cpp)
 
 target_link_libraries(webserver pthread zip)

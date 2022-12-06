@@ -16,6 +16,7 @@ _srcprefix="local:/"
 _libfiles=("CMakeLists.txt" "main.cpp"
 	"server.cpp" "server.h" "constants.hpp"
 	"zip_dir.cpp" "zip_dir.h"
+	"config.cpp" "config.h"
 )
 
 _rcfiles=(
