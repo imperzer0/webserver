@@ -13,11 +13,11 @@ RUN useradd -mg users -G wheel -s /bin/bash webserver
 RUN echo '%wheel ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
 
 RUN mkdir -p /webserver/
+COPY * /webserver/
 RUN chown webserver:users -R /webserver/
+
 RUN mkdir -p /webserver-root/
 RUN chown webserver:users -R /webserver-root/
-
-COPY * /webserver/
 
 WORKDIR /webserver/
 RUN ls -alshp
