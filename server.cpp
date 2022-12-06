@@ -22,7 +22,11 @@ static struct mg_connection* server_connection;
 // Handle interrupts, like Ctrl-C
 static int s_signo = 0;
 
-static void signal_handler(int signo) { s_signo = signo; }
+static void signal_handler(int signo)
+{
+	MG_ERROR(("[SIGNAL] Received SIG%s \"%s\". Closing server...", sigabbrev_np(signo), sigdescr_np(signo)));
+	s_signo = signo;
+}
 
 
 typedef struct

@@ -9,15 +9,15 @@ FROM archlinux:base-devel
 
 RUN pacman -Sy
 
+RUN useradd -mg users -G wheel -s /bin/bash webserver
+RUN echo '%wheel ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
+
 RUN mkdir -p /webserver/
 RUN chown webserver:users -R /webserver/
 RUN mkdir -p /webserver-root/
 RUN chown webserver:users -R /webserver-root/
 
 COPY * /webserver/
-
-RUN useradd -mg users -G wheel -s /bin/bash webserver
-RUN echo '%wheel ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
 
 WORKDIR /webserver/
 RUN ls -alshp
