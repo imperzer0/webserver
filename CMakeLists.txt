@@ -11,6 +11,8 @@ if (DEFINED APPNAME)
     add_compile_definitions(APPNAME="${APPNAME}")
 endif ()
 
+add_compile_definitions(MG_ENABLE_OPENSSL=1)
+
 if (NOT ("${CMAKE_BUILD_TYPE}" STREQUAL "Release"))
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O0")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O0")
@@ -75,4 +77,4 @@ set(CMAKE_VERBOSE_MAKEFILE on)
 
 add_executable(webserver main.cpp server.cpp zip_dir.cpp config.cpp)
 
-target_link_libraries(webserver pthread zip)
+target_link_libraries(webserver pthread zip ssl crypto)

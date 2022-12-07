@@ -32,7 +32,7 @@ Open up terminal (in ```website``` directory) and run commands
 ```bash
 sudo mkdir -p /srv/webserver/
 cd /srv/webserver/
-webserver --address "http://0.0.0.0:PORT"
+webserver
 ```
 
 ### In Docker

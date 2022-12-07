@@ -12,7 +12,9 @@
 #include "mongoose.h"
 
 
-extern const char* address;
+extern const char* http_address;
+extern const char* https_address;
+extern const char* tls_path;
 extern int log_level, hexdump;
 
 extern void server_initialize();

@@ -14,18 +14,20 @@
 #include "config.h"
 
 
-const char* address = DEFAULT_SERVER_ADDRESS;
+const char* http_address = DEFAULT_HTTP_SERVER_ADDRESS;
+const char* https_address = DEFAULT_HTTPS_SERVER_ADDRESS;
+const char* tls_path = nullptr;
 int log_level = 2, hexdump = 0;
 
 static struct mg_mgr manager{ };
-static struct mg_connection* server_connection;
+static struct mg_connection* http_server_connection, * https_server_connection;
 
 // Handle interrupts, like Ctrl-C
 static int s_signo = 0;
 
 static void signal_handler(int signo)
 {
-	MG_ERROR(("[SIGNAL] Received SIG%s \"%s\". Closing server...", sigabbrev_np(signo), sigdescr_np(signo)));
+	MG_ERROR(("[SIGNAL_HANDLER] Captured SIG%s(%d) \"%s\".", sigabbrev_np(signo), signo, sigdescr_np(signo)));
 	s_signo = signo;
 }
 
@@ -144,7 +146,24 @@ inline void handle_http_message(struct mg_connection* connection, struct mg_http
 /// Handle mongoose events
 void client_handler(struct mg_connection* connection, int ev, void* ev_data, void* fn_data)
 {
-	if (ev == MG_EV_HTTP_MSG)
+	if (fn_data != nullptr && ev == MG_EV_ACCEPT)
+	{
+		std::string stls_path(tls_path);
+		if (!stls_path.ends_with('/')) stls_path += '/';
+		
+		std::string cert_path(stls_path);
+		cert_path += "cert.pem";
+		
+		std::string key_path(stls_path);
+		key_path += "key.pem";
+		
+		struct mg_tls_opts opts = {
+				.cert = cert_path.c_str(),   // Certificate PEM file
+				.certkey = key_path.c_str(), // This pem contains both cert and key
+		};
+		mg_tls_init(connection, &opts);
+	}
+	else if (ev == MG_EV_HTTP_MSG)
 	{
 		auto* msg = static_cast<mg_http_message*>(ev_data);
 		handle_http_message(connection, msg);
@@ -163,22 +182,41 @@ void server_initialize()
 	register_additional_handlers();
 }
 
-/// Start listening on given address and run server loop
+/// Start listening on given http_address and run server loop
 void server_run()
 {
-	if (!(server_connection = mg_http_listen(&manager, address, client_handler, nullptr)))
+	if (!(http_server_connection = mg_http_listen(&manager, http_address, client_handler, nullptr)))
 	{
-		MG_ERROR(("Cannot start listening on %s. Use 'http://ADDR:PORT' or just ':PORT'", address));
+		MG_ERROR(("Cannot start listening on %s. Use 'http://ADDR:PORT' or just ':PORT' as http address parameter", http_address));
 		exit(EXIT_FAILURE);
 	}
 	
-	if (hexdump) server_connection->is_hexdumping = 1;
+	if (tls_path)
+		if (!(https_server_connection = mg_http_listen(&manager, https_address, client_handler, (void*)1)))
+		{
+			MG_ERROR(("Cannot start listening on %s. Use 'https://ADDR:PORT' or just ':PORT' as https address parameter", https_address));
+			exit(EXIT_FAILURE);
+		}
+	
+	if (hexdump) http_server_connection->is_hexdumping = 1;
+	if (hexdump) https_server_connection->is_hexdumping = 1;
 	
 	auto cwd = getcwd();
 	
+	MG_INFO((""));
 	MG_INFO(("Mongoose v" MG_VERSION));
-	MG_INFO(("Server listening on : [%s]", address));
+	MG_INFO(("Server listening on : [%s]", http_address));
 	MG_INFO(("Web root directory  : [file://%s/]", cwd));
+	MG_INFO((""));
+	
+	if (tls_path)
+	{
+		MG_INFO((""));
+		MG_INFO(("Mongoose v" MG_VERSION));
+		MG_INFO(("Server listening on : [%s]", https_address));
+		MG_INFO(("Web root directory  : [file://%s/]", cwd));
+		MG_INFO((""));
+	}
 	
 	delete[] cwd;
 	

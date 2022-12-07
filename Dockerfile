@@ -16,17 +16,37 @@ RUN mkdir -p /webserver/
 COPY * /webserver/
 RUN chown webserver:users -R /webserver/
 
-RUN mkdir -p /webserver-root/
-RUN chown webserver:users -R /webserver-root/
+RUN mkdir -p /srv/webserver/
+RUN chown webserver:users -R /srv/webserver/
+
+RUN mkdir -p /srv/certs/
+RUN chown webserver:users -R /srv/certs/
 
 WORKDIR /webserver/
 RUN ls -alshp
 USER webserver
 RUN makepkg -sif --noconfirm
 
-EXPOSE 80
+EXPOSE 80 443
 
-WORKDIR /webserver-root/
+WORKDIR /srv/certs/
+RUN /bin/bash -c "echo -e \"CASUBJ=\"/C=UA/ST=Ukraine/L=Zakarpattia/O=imperzer0/CN=CAwebserver\";\n\
+                            CRTSUBJ=\"/C=UA/ST=Ukraine/L=Zakarpattia/O=imperzer0/CN=CRTwebserver\";\n\
+                            # Generate CA (Certificate Authority)\
+                            openssl genrsa -out ca.key 2048;\
+                            openssl req -new -x509 -days 365 -key ca.key -out ca.pem -subj \\\$CASUBJ;\
+                            # Generate server certificate\
+                            openssl genrsa -out key.pem 2048;\
+                            openssl req -new -key key.pem -out csr.pem -subj \\\$CRTSUBJ;\
+                            openssl x509 -req -days 365 -in csr.pem -CA ca.pem -CAkey ca.key -set_serial 01 -out cert.pem;\"\
+                  > generator.bash; chmod +x generator.bash; bash generator.bash"
 RUN ls -alshp
 
-ENTRYPOINT ["/bin/bash", "-c", "cd /webserver-root/; /bin/webserver"]
+WORKDIR /srv/webserver/
+RUN ls -alshp
+
+USER root
+RUN ["/bin/bash", "-c", "echo -e 'cd /srv/webserver/;\n/bin/webserver $@;' > /script.bash; chmod +x /script.bash"]
+
+USER webserver
+ENTRYPOINT ["/bin/bash", "/script.bash", "--tls", "/srv/certs/"]

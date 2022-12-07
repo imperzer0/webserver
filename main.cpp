@@ -9,14 +9,16 @@
 #include <getopt.h>
 
 
-static constexpr const char* short_args = "a:l:Hvh";
+static constexpr const char* short_args = "t:l:Hvh";
 static constexpr struct option long_args[] = {
-		{ "address",  required_argument, nullptr, 'a' },
-		{ "loglevel", required_argument, nullptr, 'l' },
-		{ "hexdump",  no_argument,       nullptr, 'H' },
-		{ "version",  no_argument,       nullptr, 'v' },
-		{ "help",     no_argument,       nullptr, 'h' },
-		{ nullptr, 0,                    nullptr, 0 }
+		{ "http_address",  required_argument, nullptr, 10 },
+		{ "https_address", required_argument, nullptr, 11 },
+		{ "tls",           required_argument, nullptr, 't' },
+		{ "loglevel",      required_argument, nullptr, 'l' },
+		{ "hexdump",       no_argument,       nullptr, 'H' },
+		{ "version",       no_argument,       nullptr, 'v' },
+		{ "help",          no_argument,       nullptr, 'h' },
+		{ nullptr, 0,                         nullptr, 0 }
 };
 
 
@@ -26,12 +28,23 @@ inline static void help()
 	::printf("Usage: " APPNAME " [OPTIONS]...\n");
 	::printf("Runs http server.\n");
 	::printf("Options:\n");
-	::printf(" --address    | a  <address>   Listening address. Default: %s\n", address);
-	::printf(" --loglevel   | l  <level>     Set log level (from 0 to 4). Default: %d\n", log_level);
-	::printf(" --hexdump    | H              Enable hex dump.\n");
-	::printf(" --version    | v              Show version information.\n");
-	::printf(" --help       | h              Show this help message.\n");
-	::printf("\n");
+	::printf(" --http_address  |    <ip address>  Listening http_address. Default: %s\n", http_address);
+	::printf(" --https_address |    <ip address>  Listening https_address. Default: %s\n", https_address);
+	::printf(" --tls           | t  <path>        Path to ssl keypair directory. If not specified - no tls.\n");
+	::printf(" --loglevel      | l  <level>       Set log level (from 0 to 4). Default: %d\n", log_level);
+	::printf(" --hexdump       | H                Enable hex dump.\n");
+	::printf(" --version       | v                Show version information.\n");
+	::printf(" --help          | h                Show this help message.\n\n");
+	::printf("* NOTE: To generate ssl certificates in specific folder run commands:\n");
+	::printf("CASUBJ=\"/C=UA/ST=Ukraine/L=Zakarpattia/O=imperzer0/CN=CAwebserver\";\n");
+	::printf("CRTSUBJ=\"/C=UA/ST=Ukraine/L=Zakarpattia/O=imperzer0/CN=CRTwebserver\";\n");
+	::printf("# Generate CA (Certificate Authority)\n");
+	::printf("openssl genrsa -out ca.key 2048;\n");
+	::printf("openssl req -new -x509 -days 365 -key ca.key -out ca.pem -subj $CASUBJ;\n");
+	::printf("# Generate server certificate\n");
+	::printf("openssl genrsa -out key.pem 2048;\n");
+	::printf("openssl req -new -key key.pem -out csr.pem -subj $CRTSUBJ;\n");
+	::printf("openssl x509 -req -days 365 -in csr.pem -CA ca.pem -CAkey ca.key -set_serial 01 -out cert.pem;\n");
 	
 	::exit(34);
 }
@@ -43,8 +56,14 @@ int main(int argc, char** argv)
 	{
 		switch (option)
 		{
-			case 'a':
-				address = ::strdup(optarg);
+			case 10:
+				http_address = ::strdup(optarg);
+				break;
+			case 11:
+				https_address = ::strdup(optarg);
+				break;
+			case 't':
+				tls_path = ::strdup(optarg);
 				break;
 			case 'l':
 				log_level = ::strtol(::strdup(optarg), nullptr, 10);

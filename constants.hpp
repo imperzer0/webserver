@@ -18,8 +18,12 @@
 #  define APPNAME "webserver"
 # endif
 
-# ifndef DEFAULT_SERVER_ADDRESS
-#  define DEFAULT_SERVER_ADDRESS "http://0.0.0.0:80"
+# ifndef DEFAULT_HTTP_SERVER_ADDRESS
+#  define DEFAULT_HTTP_SERVER_ADDRESS "http://0.0.0.0:80"
+# endif
+
+# ifndef DEFAULT_HTTPS_SERVER_ADDRESS
+#  define DEFAULT_HTTPS_SERVER_ADDRESS "https://0.0.0.0:443"
 # endif
 
 # ifndef MAX_INLINE_FILE_SIZE

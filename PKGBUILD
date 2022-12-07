@@ -2,7 +2,7 @@
 # Maintained by imper <imperator999mcpe@gmail.com>
 
 pkgname=webserver
-pkgver=1.0
+pkgver=1.1
 pkgrel=1
 pkgdesc='Lightweight web server for archlinux available in container'
 author="imperzer0"
@@ -10,7 +10,7 @@ arch=('any')
 url=https://github.com/$author/$pkgname
 license=('GPL3')
 depends=('openssl' 'gcc' 'lua' 'libzip')
-makedepends=('cmake' 'git' 'gcc' 'make' 'lua' 'libzip')
+makedepends=('cmake' 'git' 'gcc' 'make' 'openssl' 'lua' 'libzip')
 
 _srcprefix="local:/"
 _libfiles=("CMakeLists.txt" "main.cpp"
