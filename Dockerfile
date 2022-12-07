@@ -32,12 +32,12 @@ EXPOSE 80 443
 WORKDIR /srv/certs/
 RUN /bin/bash -c "echo -e \"CASUBJ=\"/C=UA/ST=Ukraine/L=Zakarpattia/O=imperzer0/CN=CAwebserver\";\n\
                             CRTSUBJ=\"/C=UA/ST=Ukraine/L=Zakarpattia/O=imperzer0/CN=CRTwebserver\";\n\
-                            # Generate CA (Certificate Authority)\
-                            openssl genrsa -out ca.key 2048;\
-                            openssl req -new -x509 -days 365 -key ca.key -out ca.pem -subj \\\$CASUBJ;\
-                            # Generate server certificate\
-                            openssl genrsa -out key.pem 2048;\
-                            openssl req -new -key key.pem -out csr.pem -subj \\\$CRTSUBJ;\
+                            # Generate CA (Certificate Authority)\n\
+                            openssl genrsa -out ca.key 2048;\n\
+                            openssl req -new -x509 -days 365 -key ca.key -out ca.pem -subj \\\$CASUBJ;\n\
+                            # Generate server certificate\n\
+                            openssl genrsa -out key.pem 2048;\n\
+                            openssl req -new -key key.pem -out csr.pem -subj \\\$CRTSUBJ;\n\
                             openssl x509 -req -days 365 -in csr.pem -CA ca.pem -CAkey ca.key -set_serial 01 -out cert.pem;\"\
                   > generator.bash; chmod +x generator.bash; bash generator.bash"
 RUN ls -alshp
