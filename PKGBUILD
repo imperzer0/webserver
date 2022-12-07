@@ -9,8 +9,8 @@ author="imperzer0"
 arch=('any')
 url=https://github.com/$author/$pkgname
 license=('GPL3')
-depends=('openssl' 'gcc' 'lua' 'libzip')
-makedepends=('cmake' 'git' 'gcc' 'make' 'openssl' 'lua' 'libzip')
+depends=('openssl' 'gcc' 'libzip')
+makedepends=('cmake' 'git' 'gcc' 'make' 'openssl' 'libzip')
 
 _srcprefix="local:/"
 _libfiles=("CMakeLists.txt" "main.cpp"
