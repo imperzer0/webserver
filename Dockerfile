@@ -27,7 +27,7 @@ RUN ls -alshp
 USER webserver
 RUN makepkg -sif --noconfirm
 
-EXPOSE 80 443
+EXPOSE 80 443 21
 
 WORKDIR /srv/certs/
 RUN /bin/bash -c "echo -e \"CASUBJ=\"/C=UA/ST=Ukraine/L=Zakarpattia/O=imperzer0/CN=CAwebserver\";\n\

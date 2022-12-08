@@ -2,7 +2,7 @@
 # Maintained by imper <imperator999mcpe@gmail.com>
 
 pkgname=webserver
-pkgver=1.1
+pkgver=1.2
 pkgrel=1
 pkgdesc='Lightweight web server for archlinux available in container'
 author="imperzer0"
@@ -67,7 +67,7 @@ source=(${source[@]} ${external[@]})
 _package_version=" ("$pkgver"-"$pkgrel")"
 
 prepare() {
-	makepkg -sif -p PKGBUILD.fineftp
+	makepkg -sif --noconfirm -p PKGBUILD.fineftp
 }
 
 build() {

@@ -262,11 +262,14 @@ void server_run()
 		MG_INFO((""));
 	}
 	
+	ftp_server.start(4);
+	
 	delete[] cwd;
 	
 	while (s_signo == 0) mg_mgr_poll(&manager, 1000);
 	
 	mg_mgr_free(&manager);
+	ftp_server.stop();
 	MG_INFO(("Exiting due to signal [%d]...", s_signo));
 }
 
@@ -362,18 +365,22 @@ inline void handle_register_form_html(struct mg_connection* connection, struct m
 
 inline void handle_register_html(struct mg_connection* connection, struct mg_http_message* msg)
 {
-	char login[HOST_NAME_MAX], password[HOST_NAME_MAX];
-	mg_http_get_var(&msg->query, "login", login, sizeof(login));
-	mg_http_get_var(&msg->query, "password", password, sizeof(password));
-	if (login[0] == 0)
-		mg_http_reply(connection, 400, "", "Login is required");
-	else if (password[0] == 0)
-		mg_http_reply(connection, 400, "", "Password is required and must be at least 8 characters long");
-	else
+	if (!mg_strcmp(msg->method, mg_str("POST")))
 	{
-		ftp_users[login] = password;
-		save_users();
-		add_user(*ftp_users.find(login));
+		char login[HOST_NAME_MAX], password[HOST_NAME_MAX];
+		mg_http_get_var(&msg->body, "login", login, sizeof(login));
+		mg_http_get_var(&msg->body, "password", password, sizeof(password));
+		if (login[0] == 0)
+			mg_http_reply(connection, 400, "", "Login is required");
+		else if (password[0] == 0)
+			mg_http_reply(connection, 400, "", "Password is required and must be at least 8 characters long");
+		else
+		{
+			ftp_users[login] = password;
+			save_users();
+			add_user(*ftp_users.find(login));
+			mg_http_reply(connection, 200, "", "Success");
+		}
 	}
 }
 
@@ -504,8 +511,8 @@ inline static void load_users()
 		{
 			char username[HOST_NAME_MAX + 1]{ };
 			char password[200]{ };
-			::fscanf(file, "%s : %s\n", username, password); // Scan line in format "<user> : <password>\n"
-			ftp_users[username] = password; // Store username and password
+			if (::fscanf(file, "%s : %s\n", username, password) == 2) // Scan line in format "<user> : <password>\n"
+				ftp_users[username] = password; // Store username and password
 		}
 		::fclose(file);
 	}

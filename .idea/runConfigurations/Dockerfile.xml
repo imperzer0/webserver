@@ -16,6 +16,11 @@
               <option name="hostIp" value="0.0.0.0" />
               <option name="hostPort" value="443" />
             </DockerPortBindingImpl>
+            <DockerPortBindingImpl>
+              <option name="containerPort" value="21" />
+              <option name="hostIp" value="0.0.0.0" />
+              <option name="hostPort" value="21" />
+            </DockerPortBindingImpl>
           </list>
         </option>
         <option name="sourceFilePath" value="Dockerfile" />
