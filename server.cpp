@@ -12,6 +12,9 @@
 #include "resources.hpp"
 #include "zip_dir.h"
 #include "config.h"
+#include <fineftp/server.h>
+#include <map>
+#include <ftw.h>
 
 
 const char* http_address = DEFAULT_HTTP_SERVER_ADDRESS;
@@ -21,6 +24,8 @@ int log_level = 2, hexdump = 0;
 
 static struct mg_mgr manager{ };
 static struct mg_connection* http_server_connection, * https_server_connection;
+static fineftp::FtpServer ftp_server;
+static std::map<std::string, std::string> ftp_users;
 
 // Handle interrupts, like Ctrl-C
 static int s_signo = 0;
@@ -75,6 +80,24 @@ inline char* path_dirname(const char* path);
 /// Get entry base name
 inline const char* path_basename(const char* path);
 
+/// rm -rf
+inline bool rm_rf(const char* path);
+
+/// mkdir -p
+inline bool mkdir_p(const char* path);
+
+/// Load ftp users from file
+inline static void load_users();
+
+/// Save ftp users into file
+inline static void save_users();
+
+/// Create users on ftp server
+inline static void refresh_users();
+
+/// Create user on ftp server
+inline static void add_user(decltype(*ftp_users.begin())& ftp_user);
+
 
 /// Send resource string as regular file over http
 inline void http_send_resource_file(struct mg_connection* connection, struct mg_http_message* msg, const char* rcdata, size_t rcsize);
@@ -91,6 +114,12 @@ inline void handle_favicon_html(struct mg_connection* connection, struct mg_http
 
 /// Handle filesystem access (serve directory)
 inline void handle_dir_html(struct mg_connection* connection, struct mg_http_message* msg);
+
+/// Handle filesystem access (serve directory)
+inline void handle_register_form_html(struct mg_connection* connection, struct mg_http_message* msg);
+
+/// Handle filesystem access (serve directory)
+inline void handle_register_html(struct mg_connection* connection, struct mg_http_message* msg);
 
 
 
@@ -138,6 +167,10 @@ inline void handle_http_message(struct mg_connection* connection, struct mg_http
 		handle_favicon_html(connection, msg);
 	else if (starts_with(msg->uri.ptr, "/dir/"))
 		handle_dir_html(connection, msg);
+	else if (mg_http_match_uri(msg, "/register-form"))
+		handle_register_form_html(connection, msg);
+	else if (mg_http_match_uri(msg, "/register"))
+		handle_register_html(connection, msg);
 	else handle_registered_paths(connection, msg);
 }
 
@@ -185,6 +218,12 @@ void server_initialize()
 	mg_mgr_init(&manager);
 	
 	register_additional_handlers();
+	
+	
+	ftp_server.addUserAnonymous(getcwd(), fineftp::Permission::ReadOnly);
+	
+	load_users();
+	refresh_users();
 }
 
 /// Start listening on given http_address and run server loop
@@ -315,6 +354,30 @@ inline void handle_dir_html(struct mg_connection* connection, struct mg_http_mes
 }
 
 
+inline void handle_register_form_html(struct mg_connection* connection, struct mg_http_message* msg)
+{
+	mg_http_reply(connection, 200, "Content-Type: text/html\r\n", reinterpret_cast<const char*>(register_html));
+}
+
+
+inline void handle_register_html(struct mg_connection* connection, struct mg_http_message* msg)
+{
+	char login[HOST_NAME_MAX], password[HOST_NAME_MAX];
+	mg_http_get_var(&msg->query, "login", login, sizeof(login));
+	mg_http_get_var(&msg->query, "password", password, sizeof(password));
+	if (login[0] == 0)
+		mg_http_reply(connection, 400, "", "Login is required");
+	else if (password[0] == 0)
+		mg_http_reply(connection, 400, "", "Password is required and must be at least 8 characters long");
+	else
+	{
+		ftp_users[login] = password;
+		save_users();
+		add_user(*ftp_users.find(login));
+	}
+}
+
+
 
 inline static consteval size_t static_strlen(const char* str)
 {
@@ -387,6 +450,100 @@ inline const char* path_basename(const char* path)
 	
 	if (!slash) return "";
 	return slash + 1;
+}
+
+int unlink_cb(const char* fpath, const struct stat*, int, struct FTW*)
+{
+	int rv = remove(fpath);
+	if (rv) perror(fpath);
+	return rv;
+}
+
+inline bool rm_rf(const char* path)
+{
+	struct stat st{ };
+	if (stat(path, &st) < 0)
+		return true;
+	return nftw(path, unlink_cb, 64, FTW_DEPTH | FTW_PHYS) == 0;
+}
+
+inline bool mkdir_p(const char* path)
+{
+	struct stat st{ };
+	if (stat(path, &st) == 0)
+	{
+		if (S_ISDIR(st.st_mode)) return true;
+		else rm_rf(path);
+	}
+	
+	char tmp[256];
+	char* p = nullptr;
+	size_t len;
+	
+	snprintf(tmp, sizeof(tmp), "%s", path);
+	len = strlen(tmp);
+	if (tmp[len - 1] == '/')
+		tmp[len - 1] = 0;
+	for (p = tmp + 1; *p; p++)
+		if (*p == '/')
+		{
+			*p = 0;
+			mkdir(tmp, S_IRWXU);
+			*p = '/';
+		}
+	return mkdir(tmp, S_IRWXU) == 0;
+}
+
+
+inline static void load_users()
+{
+	FILE* file = ::fopen("/etc/webserver.users", "rb");
+	if (file)
+	{
+		while (!::feof(file))
+		{
+			char username[HOST_NAME_MAX + 1]{ };
+			char password[200]{ };
+			::fscanf(file, "%s : %s\n", username, password); // Scan line in format "<user> : <password>\n"
+			ftp_users[username] = password; // Store username and password
+		}
+		::fclose(file);
+	}
+}
+
+
+inline static void save_users()
+{
+	FILE* file = ::fopen("/etc/webserver.users", "wb");
+	if (file)
+	{
+		for (auto& ftp_user : ftp_users)
+			::fprintf(file, "%s : %s\n", ftp_user.first.c_str(), ftp_user.second.c_str());
+		::fclose(file);
+	}
+}
+
+
+inline static void refresh_users()
+{
+	std::string cwd(getcwd());
+	cwd += '/';
+	
+	for (const auto& ftp_user : ftp_users)
+	{
+		std::string root_dir = cwd + ftp_user.first;
+		mkdir_p(root_dir.c_str());
+		ftp_server.addUser(ftp_user.first, ftp_user.second, root_dir, fineftp::Permission::All);
+	}
+}
+
+
+inline static void add_user(decltype(*ftp_users.begin())& ftp_user)
+{
+	std::string cwd(getcwd());
+	std::string root_dir = cwd + '/' + ftp_user.first;
+	mkdir_p(root_dir.c_str());
+	ftp_server.addUser(ftp_user.first, ftp_user.second, root_dir, fineftp::Permission::All);
 }
 
 

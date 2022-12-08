@@ -24,6 +24,12 @@ _rcfiles=(
 	"resources/favicon.ico"
 	"resources/index.html"
 	"resources/article.html"
+	"resources/register.html"
+)
+
+_ftpfiles=(
+	"Findasio.cmake.patch"
+	"PKGBUILD.fineftp"
 )
 
 # shellcheck disable=SC2068
@@ -35,6 +41,12 @@ done
 # shellcheck disable=SC2068
 for _rcfile in ${_rcfiles[@]}; do
 	source=(${source[@]} "$_srcprefix/$_rcfile")
+	sha512sums=(${sha512sums[@]} "SKIP")
+done
+
+# shellcheck disable=SC2068
+for _ftpfile in ${_ftpfiles[@]}; do
+	source=(${source[@]} "$_srcprefix/$_ftpfile")
 	sha512sums=(${sha512sums[@]} "SKIP")
 done
 
@@ -53,6 +65,10 @@ sha512sums=(${sha512sums[@]} "eb472a2ad6997f107d5f7db6f311294f34066f08fd6d7bf8c6
 source=(${source[@]} ${external[@]})
 
 _package_version=" ("$pkgver"-"$pkgrel")"
+
+prepare() {
+	makepkg -sif -p PKGBUILD.fineftp
+}
 
 build() {
 	cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++ \

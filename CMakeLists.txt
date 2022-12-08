@@ -28,6 +28,7 @@ set(resource_files
         "favicon.ico"
         "index.html"
         "article.html"
+        "register.html"
         )
 
 # Creates C resources file from files in given directory
