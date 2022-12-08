@@ -175,6 +175,11 @@ void server_initialize()
 {
 	signal(SIGINT, signal_handler);
 	signal(SIGTERM, signal_handler);
+	signal(SIGABRT, signal_handler);
+	signal(SIGKILL, signal_handler);
+	signal(SIGTERM, signal_handler);
+	signal(SIGQUIT, signal_handler);
+	signal(SIGHUP, signal_handler);
 	
 	mg_log_set(log_level);
 	mg_mgr_init(&manager);
