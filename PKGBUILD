@@ -73,7 +73,7 @@ prepare() {
 build() {
 	cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++ \
 		-DPACKAGE_VERSION="$_package_version" -DAPPNAME="$pkgname" .
-	make -j 6
+	make -j 8
 }
 
 package() {

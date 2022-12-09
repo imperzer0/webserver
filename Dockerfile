@@ -5,7 +5,7 @@
 # Commercial usage must be agreed with the author of this comment.
 
 
-FROM archlinux
+FROM archlinux AS build
 
 RUN pacman -Sy base-devel --noconfirm
 
@@ -20,14 +20,19 @@ WORKDIR /webserver/
 RUN ls -alshp
 USER webserver
 RUN makepkg -sif --noconfirm
-USER root
+
+FROM archlinux
+
+RUN mkdir -p /pack/
+COPY --from=build /webserver/*.pkg.tar.zst /pack/
+WORKDIR /pack/
+RUN pacman -Sy
+RUN pacman -U *.pkg.tar.zst --noconfirm
 
 RUN mkdir -p /srv/webserver/
 RUN mkdir -p /srv/certs/
-RUN chown webserver:users -R /srv/
-RUN chmod -R 0755 /srv/
 
-EXPOSE 80 443 21 20
+EXPOSE 80 443 21
 
 WORKDIR /srv/certs/
 RUN /bin/bash -c "echo -e \"CASUBJ=\"/C=UA/ST=Ukraine/L=Zakarpattia/O=imperzer0/CN=CAwebserver\";\n\
@@ -63,6 +68,5 @@ RUN ["/bin/bash", "-c", "echo -e 'cd /srv/webserver/;\n/bin/webserver $@;' > /sc
 #RUN echo -e "root:\$6\$MVBXiuW1Hhl3OeF9\$M01MasH4nnCwfypFNgIbniEKKe2yPi/hdqbggFd1.KkjYjqxP9Hr2J1i95Q1TSo4ySqewc62Xezi6LcBE3OEp.:19322:0:99999:7:::\n\
 #    webserver:\$6\$MVBXiuW1Hhl3OeF9\$M01MasH4nnCwfypFNgIbniEKKe2yPi/hdqbggFd1.KkjYjqxP9Hr2J1i95Q1TSo4ySqewc62Xezi6LcBE3OEp.:19322:0:99999:7:::" > /etc/shadow-
 
-USER webserver
 ENTRYPOINT ["/bin/bash", "/script.bash", "--tls", "/srv/certs/"]
 #ENTRYPOINT ["/bin/sshd", "-D"]
