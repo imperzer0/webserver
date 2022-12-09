@@ -93,7 +93,7 @@ inline static void load_users();
 inline static void save_users();
 
 /// Create users on ftp server
-inline static void refresh_users();
+inline static void forward_all_users();
 
 /// Create user on ftp server
 inline static void add_user(decltype(*ftp_users.begin())& ftp_user);
@@ -219,11 +219,13 @@ void server_initialize()
 	
 	register_additional_handlers();
 	
-	
+	MG_INFO(("[FTP] Adding anonymous user to ftp server..."));
 	ftp_server.addUserAnonymous(getcwd(), fineftp::Permission::ReadOnly);
 	
+	MG_INFO(("[FTP] Loading users from file..."));
 	load_users();
-	refresh_users();
+	MG_INFO(("[FTP] Forwarding users to ftp server..."));
+	forward_all_users();
 }
 
 /// Start listening on given http_address and run server loop
@@ -263,6 +265,10 @@ void server_run()
 	}
 	
 	ftp_server.start(4);
+	MG_INFO(("[FTP]"));
+	MG_INFO(("[FTP] Started ftp server on : [ftp://%s:%d]", ftp_server.getAddress().c_str(), ftp_server.getPort()));
+	MG_INFO(("[FTP] Web root directory    : [file://%s/]", cwd));
+	MG_INFO(("[FTP]"));
 	
 	delete[] cwd;
 	
@@ -371,15 +377,23 @@ inline void handle_register_html(struct mg_connection* connection, struct mg_htt
 		mg_http_get_var(&msg->body, "login", login, sizeof(login));
 		mg_http_get_var(&msg->body, "password", password, sizeof(password));
 		if (login[0] == 0)
+		{
 			mg_http_reply(connection, 400, "", "Login is required");
+		}
 		else if (password[0] == 0)
+		{
 			mg_http_reply(connection, 400, "", "Password is required and must be at least 8 characters long");
-		else
+		}
+		else if (!ftp_users.contains(login))
 		{
 			ftp_users[login] = password;
 			save_users();
 			add_user(*ftp_users.find(login));
 			mg_http_reply(connection, 200, "", "Success");
+		}
+		else
+		{
+			mg_http_reply(connection, 400, "", "User already exists");
 		}
 	}
 }
@@ -531,7 +545,7 @@ inline static void save_users()
 }
 
 
-inline static void refresh_users()
+inline static void forward_all_users()
 {
 	std::string cwd(getcwd());
 	cwd += '/';
@@ -539,8 +553,11 @@ inline static void refresh_users()
 	for (const auto& ftp_user : ftp_users)
 	{
 		std::string root_dir = cwd + ftp_user.first;
-		mkdir_p(root_dir.c_str());
-		ftp_server.addUser(ftp_user.first, ftp_user.second, root_dir, fineftp::Permission::All);
+		if (mkdir_p(root_dir.c_str()))
+		{
+			MG_INFO(("[FTP] Adding user \"%s\" to ftp server...", ftp_user.first.c_str()));
+			ftp_server.addUser(ftp_user.first, ftp_user.second, root_dir, fineftp::Permission::All);
+		}
 	}
 }
 
@@ -549,8 +566,11 @@ inline static void add_user(decltype(*ftp_users.begin())& ftp_user)
 {
 	std::string cwd(getcwd());
 	std::string root_dir = cwd + '/' + ftp_user.first;
-	mkdir_p(root_dir.c_str());
-	ftp_server.addUser(ftp_user.first, ftp_user.second, root_dir, fineftp::Permission::All);
+	if (mkdir_p(root_dir.c_str()))
+	{
+		MG_INFO(("[FTP] Adding user \"%s\" to ftp server...", ftp_user.first.c_str()));
+		ftp_server.addUser(ftp_user.first, ftp_user.second, root_dir, fineftp::Permission::All);
+	}
 }
 
 

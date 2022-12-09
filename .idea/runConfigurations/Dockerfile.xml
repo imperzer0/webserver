@@ -8,18 +8,19 @@
           <list>
             <DockerPortBindingImpl>
               <option name="containerPort" value="80" />
-              <option name="hostIp" value="0.0.0.0" />
               <option name="hostPort" value="80" />
             </DockerPortBindingImpl>
             <DockerPortBindingImpl>
               <option name="containerPort" value="443" />
-              <option name="hostIp" value="0.0.0.0" />
               <option name="hostPort" value="443" />
             </DockerPortBindingImpl>
             <DockerPortBindingImpl>
               <option name="containerPort" value="21" />
-              <option name="hostIp" value="0.0.0.0" />
               <option name="hostPort" value="21" />
+            </DockerPortBindingImpl>
+            <DockerPortBindingImpl>
+              <option name="containerPort" value="20" />
+              <option name="hostPort" value="20" />
             </DockerPortBindingImpl>
           </list>
         </option>

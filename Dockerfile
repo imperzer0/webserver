@@ -5,9 +5,9 @@
 # Commercial usage must be agreed with the author of this comment.
 
 
-FROM archlinux:base-devel
+FROM archlinux
 
-RUN pacman -Sy
+RUN pacman -Sy base-devel --noconfirm
 
 RUN useradd -mg users -G wheel -s /bin/bash webserver
 RUN echo '%wheel ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
@@ -16,18 +16,18 @@ RUN mkdir -p /webserver/
 COPY * /webserver/
 RUN chown webserver:users -R /webserver/
 
-RUN mkdir -p /srv/webserver/
-RUN chown webserver:users -R /srv/webserver/
-
-RUN mkdir -p /srv/certs/
-RUN chown webserver:users -R /srv/certs/
-
 WORKDIR /webserver/
 RUN ls -alshp
 USER webserver
 RUN makepkg -sif --noconfirm
+USER root
 
-EXPOSE 80 443 21
+RUN mkdir -p /srv/webserver/
+RUN mkdir -p /srv/certs/
+RUN chown webserver:users -R /srv/
+RUN chmod -R 0755 /srv/
+
+EXPOSE 80 443 21 20
 
 WORKDIR /srv/certs/
 RUN /bin/bash -c "echo -e \"CASUBJ=\"/C=UA/ST=Ukraine/L=Zakarpattia/O=imperzer0/CN=CAwebserver\";\n\
@@ -45,8 +45,24 @@ RUN ls -alshp
 WORKDIR /srv/webserver/
 RUN ls -alshp
 
-USER root
 RUN ["/bin/bash", "-c", "echo -e 'cd /srv/webserver/;\n/bin/webserver $@;' > /script.bash; chmod +x /script.bash"]
+
+#RUN pacman -Sy openssh gdb rsync --noconfirm
+#EXPOSE 2222
+#RUN /usr/bin/ssh-keygen -A
+#RUN echo -e "Port 2222\n\
+#          PermitRootLogin yes\n\
+#          PermitEmptyPasswords yes\n\
+#          AuthorizedKeysFile      .ssh/authorized_keys\n\
+#          KbdInteractiveAuthentication no\n\
+#          UsePAM yes\n\
+#          PrintMotd no\n\
+#          Subsystem       sftp    /usr/lib/ssh/sftp-server" > /etc/ssh/sshd_config
+#RUN echo -e "root:\$6\$MVBXiuW1Hhl3OeF9\$M01MasH4nnCwfypFNgIbniEKKe2yPi/hdqbggFd1.KkjYjqxP9Hr2J1i95Q1TSo4ySqewc62Xezi6LcBE3OEp.:19322:0:99999:7:::\n\
+#    webserver:\$6\$MVBXiuW1Hhl3OeF9\$M01MasH4nnCwfypFNgIbniEKKe2yPi/hdqbggFd1.KkjYjqxP9Hr2J1i95Q1TSo4ySqewc62Xezi6LcBE3OEp.:19322:0:99999:7:::" > /etc/shadow
+#RUN echo -e "root:\$6\$MVBXiuW1Hhl3OeF9\$M01MasH4nnCwfypFNgIbniEKKe2yPi/hdqbggFd1.KkjYjqxP9Hr2J1i95Q1TSo4ySqewc62Xezi6LcBE3OEp.:19322:0:99999:7:::\n\
+#    webserver:\$6\$MVBXiuW1Hhl3OeF9\$M01MasH4nnCwfypFNgIbniEKKe2yPi/hdqbggFd1.KkjYjqxP9Hr2J1i95Q1TSo4ySqewc62Xezi6LcBE3OEp.:19322:0:99999:7:::" > /etc/shadow-
 
 USER webserver
 ENTRYPOINT ["/bin/bash", "/script.bash", "--tls", "/srv/certs/"]
+#ENTRYPOINT ["/bin/sshd", "-D"]
