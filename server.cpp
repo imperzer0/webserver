@@ -23,7 +23,7 @@ const char* tls_path = nullptr;
 int log_level = 2, hexdump = 0;
 
 static struct mg_mgr manager{ };
-static struct mg_connection* http_server_connection, * https_server_connection;
+static struct mg_connection* http_server_connection = nullptr, * https_server_connection = nullptr;
 static fineftp::FtpServer ftp_server;
 static std::map<std::string, std::string> ftp_users;
 
@@ -66,7 +66,7 @@ static registered_path_handlers* handlers_head = nullptr;
 inline bool starts_with(const char* str, const char* prefix);
 
 /// Get current working directory
-inline char* getcwd();
+inline std::string getcwd();
 
 /// Erase all seq occurrences in str
 inline std::string erase_all(const std::string& str, const std::string& seq);
@@ -75,16 +75,16 @@ inline std::string erase_all(const std::string& str, const std::string& seq);
 inline std::string secure_path(const std::string& path);
 
 /// Get parent directory name of entry at given path
-inline char* path_dirname(const char* path);
+inline std::string path_dirname(const std::string& path);
 
 /// Get entry base name
-inline const char* path_basename(const char* path);
+inline std::string path_basename(std::string path);
 
 /// rm -rf
-inline bool rm_rf(const char* path);
+inline bool rm_rf(const std::string& path);
 
 /// mkdir -p
-inline bool mkdir_p(const char* path);
+inline bool mkdir_p(const std::string& path);
 
 /// Load ftp users from file
 inline static void load_users();
@@ -128,7 +128,6 @@ void register_path_handler(const std::string& path, const std::string& descripti
 {
 	if (!handlers_head)
 	{
-		delete handlers;
 		handlers = new registered_path_handlers{
 				.data = new registered_path_handler{ .path = path, .description = description, .fn = fn },
 				.next = nullptr };
@@ -238,39 +237,42 @@ void server_run()
 	}
 	
 	if (tls_path)
+	{
 		if (!(https_server_connection = mg_http_listen(&manager, https_address, client_handler, (void*)1)))
 		{
 			MG_ERROR(("Cannot start listening on %s. Use 'https://ADDR:PORT' or just ':PORT' as https address parameter", https_address));
-			exit(EXIT_FAILURE);
+			https_server_connection = nullptr;
 		}
+	}
 	
-	if (hexdump) http_server_connection->is_hexdumping = 1;
-	if (hexdump) https_server_connection->is_hexdumping = 1;
+	if (hexdump)
+		http_server_connection->is_hexdumping = 1;
+	
+	if (hexdump && https_server_connection)
+		https_server_connection->is_hexdumping = 1;
 	
 	auto cwd = getcwd();
 	
 	MG_INFO((""));
 	MG_INFO(("Mongoose v" MG_VERSION));
 	MG_INFO(("Server listening on : [%s]", http_address));
-	MG_INFO(("Web root directory  : [file://%s/]", cwd));
+	MG_INFO(("Web root directory  : [file://%s/]", cwd.c_str()));
 	MG_INFO((""));
 	
-	if (tls_path)
+	if (https_server_connection)
 	{
 		MG_INFO((""));
 		MG_INFO(("Mongoose v" MG_VERSION));
 		MG_INFO(("Server listening on : [%s]", https_address));
-		MG_INFO(("Web root directory  : [file://%s/]", cwd));
+		MG_INFO(("Web root directory  : [file://%s/]", cwd.c_str()));
 		MG_INFO((""));
 	}
 	
 	ftp_server.start(4);
 	MG_INFO(("[FTP]"));
 	MG_INFO(("[FTP] Started ftp server on : [ftp://%s:%d]", ftp_server.getAddress().c_str(), ftp_server.getPort()));
-	MG_INFO(("[FTP] Web root directory    : [file://%s/]", cwd));
+	MG_INFO(("[FTP] Web root directory    : [file://%s/]", cwd.c_str()));
 	MG_INFO(("[FTP]"));
-	
-	delete[] cwd;
 	
 	while (s_signo == 0) mg_mgr_poll(&manager, 1000);
 	
@@ -310,56 +312,52 @@ inline void handle_favicon_html(struct mg_connection* connection, struct mg_http
 inline void handle_dir_html(struct mg_connection* connection, struct mg_http_message* msg)
 {
 	char* path = nullptr;
+	auto cwd = getcwd();
 	
-	char* uri = new char[msg->uri.len + 1];
-	strncpy(uri, msg->uri.ptr, msg->uri.len);
-	uri[msg->uri.len] = 0;
+	std::string uri(msg->uri.ptr, msg->uri.len);
+	strscanf(uri.c_str(), "/dir/%s", &path);
 	
-	::strscanf(uri, "/dir/%s", &path);
-	
-	std::string strpath(path ? path : "");
-	
-	delete[] uri;
+	std::string spath(secure_path(path ? path : ""));
 	delete[] path;
 	
-	std::string spath(secure_path(strpath));
-	
 	if (!spath.starts_with('/')) spath = "/" + spath;
-	std::string spath_full(getcwd() + spath);
+	std::string spath_full(cwd + spath);
 	
 	struct stat st{ };
-	if (::stat(spath_full.c_str(), &st) == 0)
+	if (::stat(spath_full.c_str(), &st) != 0)
 	{
-		struct mg_http_serve_opts opts{ .root_dir = getcwd() };
-		std::string extra_header;
-		
-		if (st.st_size > MAX_INLINE_FILE_SIZE)
-		{
-			extra_header = "Content-Disposition: attachment; filename=\"";
-			extra_header += path_basename(spath.c_str());
-			extra_header += "\"\r\n";
-			
-			opts.extra_headers = extra_header.c_str();
-		}
-		
-		std::string msgstrcp(msg->message.ptr, msg->uri.ptr);
-		msgstrcp += spath;
-		
-		struct mg_http_message msg2{ };
-		msg2.message = mg_str_n(msgstrcp.data(), msgstrcp.size());
-		msg2.uri = mg_str_n(msg2.message.ptr + (msg->uri.ptr - msg->message.ptr), spath.size());
-		msg2.method = msg->method;
-		msg2.query = msg->query;
-		msg2.proto = msg->proto;
-		msg2.body = msg->body;
-		msg2.head = msg->head;
-		msg2.chunk = msg->chunk;
-		for (size_t i = 0; i < MG_MAX_HTTP_HEADERS; ++i)
-			msg2.headers[i] = msg->headers[i];
-		
-		mg_http_serve_dir(connection, &msg2, &opts);
+		send_error_html(connection, 404, "rgba(147, 0, 0, 0.90)");
+		return;
 	}
-	else send_error_html(connection, 404, "rgba(147, 0, 0, 0.90)");
+	
+	struct mg_http_serve_opts opts{ .root_dir = cwd.c_str() };
+	std::string extra_header;
+	
+	if (st.st_size > MAX_INLINE_FILE_SIZE)
+	{
+		extra_header = "Content-Disposition: attachment; filename=\"";
+		extra_header += path_basename(spath.c_str());
+		extra_header += "\"\r\n";
+		
+		opts.extra_headers = extra_header.c_str();
+	}
+	
+	std::string msgstrcp(msg->message.ptr, msg->uri.ptr);
+	msgstrcp += spath;
+	
+	struct mg_http_message msg2{ };
+	msg2.message = mg_str_n(msgstrcp.data(), msgstrcp.size());
+	msg2.uri = mg_str_n(msg2.message.ptr + (msg->uri.ptr - msg->message.ptr), spath.size());
+	msg2.method = msg->method;
+	msg2.query = msg->query;
+	msg2.proto = msg->proto;
+	msg2.body = msg->body;
+	msg2.head = msg->head;
+	msg2.chunk = msg->chunk;
+	for (size_t i = 0; i < MG_MAX_HTTP_HEADERS; ++i)
+		msg2.headers[i] = msg->headers[i];
+	
+	mg_http_serve_dir(connection, &msg2, &opts);
 }
 
 
@@ -371,107 +369,36 @@ inline void handle_register_form_html(struct mg_connection* connection, struct m
 
 inline void handle_register_html(struct mg_connection* connection, struct mg_http_message* msg)
 {
-	if (!mg_strcmp(msg->method, mg_str("POST")))
-	{
-		char login[HOST_NAME_MAX], password[HOST_NAME_MAX];
-		mg_http_get_var(&msg->body, "login", login, sizeof(login));
-		mg_http_get_var(&msg->body, "password", password, sizeof(password));
-		if (login[0] == 0)
-		{
-			mg_http_reply(connection, 400, "", "Login is required");
-		}
-		else if (password[0] == 0)
-		{
-			mg_http_reply(connection, 400, "", "Password is required and must be at least 8 characters long");
-		}
-		else if (!ftp_users.contains(login))
-		{
-			ftp_users[login] = password;
-			save_users();
-			add_user(*ftp_users.find(login));
-			mg_http_reply(connection, 200, "", "Success");
-		}
-		else
-		{
-			mg_http_reply(connection, 400, "", "User already exists");
-		}
-	}
-}
-
-
-
-inline static consteval size_t static_strlen(const char* str)
-{
-	size_t len = 0;
-	for (; *str; ++len, ++str);
-	return len;
-}
-
-inline bool starts_with(const char* str, const char* prefix)
-{
-	for (; *prefix; ++prefix, ++str)
-		if (*prefix != *str)
-			return false;
-	return true;
-}
-
-inline char* getcwd()
-{
-	char* cwd = new char[PATH_MAX];
-	getcwd(cwd, PATH_MAX);
-	cwd[PATH_MAX - 1] = 0;
-	return cwd;
-}
-
-inline std::string erase_all(const std::string& str, const std::string& seq)
-{
-	std::string res(str, 0, seq.size());
-	res.reserve(str.size()); // optional, avoids buffer reallocations in the loop
-	for (size_t i = seq.size(); i < str.size(); ++i)
-	{
-		bool ok = false;
-		for (int j = seq.size() - 1, k = i; j >= 0; --j, --k)
-			if (seq[j] != str[k])
-			{
-				ok = true;
-				break;
-			}
-		if (ok) res += str[i];
-	}
-	return std::move(res);
-}
-
-inline std::string secure_path(const std::string& path)
-{
-	std::string res = erase_all(path, "../");
-	return erase_all(res, "/..");
-}
-
-inline char* path_dirname(const char* path)
-{
-	if (!path) return new char[1]{ };
-	char* accesible_path = ::strdup(path);
-	char* slash = nullptr;
-	for (char* tmp = accesible_path; *tmp; ++tmp)
-		if (*tmp == '/')
-			slash = tmp;
+	if (mg_strcmp(msg->method, mg_str("POST"))) return;
 	
-	if (!slash) return new char[1]{ };
-	*slash = 0;
-	return accesible_path;
+	char login[HOST_NAME_MAX]{ }, password[HOST_NAME_MAX]{ };
+	mg_http_get_var(&msg->body, "login", login, sizeof(login));
+	mg_http_get_var(&msg->body, "password", password, sizeof(password));
+	
+	if (login[0] == 0)
+	{
+		mg_http_reply(connection, 400, "", "Login is required");
+		return;
+	}
+	
+	if (password[0] == 0)
+	{
+		mg_http_reply(connection, 400, "", "Password is required and must be at least 8 characters long");
+		return;
+	}
+	
+	if (ftp_users.contains(login))
+	{
+		mg_http_reply(connection, 400, "", "User already exists");
+		return;
+	}
+	
+	ftp_users[login] = password;
+	save_users();
+	add_user(*ftp_users.find(login));
+	mg_http_reply(connection, 200, "", "Success");
 }
 
-inline const char* path_basename(const char* path)
-{
-	if (!path) return "";
-	const char* slash = nullptr;
-	for (const char* tmp = path; *tmp; ++tmp)
-		if (*tmp == '/')
-			slash = tmp;
-	
-	if (!slash) return "";
-	return slash + 1;
-}
 
 int unlink_cb(const char* fpath, const struct stat*, int, struct FTW*)
 {
@@ -488,16 +415,18 @@ inline bool rm_rf(const char* path)
 	return nftw(path, unlink_cb, 64, FTW_DEPTH | FTW_PHYS) == 0;
 }
 
+
 inline bool mkdir_p(const char* path)
 {
 	struct stat st{ };
 	if (stat(path, &st) == 0)
 	{
-		if (S_ISDIR(st.st_mode)) return true;
-		else rm_rf(path);
+		if (S_ISDIR(st.st_mode))
+			return true;
+		rm_rf(path);
 	}
 	
-	char tmp[256];
+	char tmp[256]{ };
 	char* p = nullptr;
 	size_t len;
 	
@@ -536,12 +465,11 @@ inline static void load_users()
 inline static void save_users()
 {
 	FILE* file = ::fopen("/etc/webserver.users", "wb");
-	if (file)
-	{
-		for (auto& ftp_user : ftp_users)
-			::fprintf(file, "%s : %s\n", ftp_user.first.c_str(), ftp_user.second.c_str());
-		::fclose(file);
-	}
+	if (!file)
+		return;
+	for (auto& ftp_user : ftp_users)
+		::fprintf(file, "%s : %s\n", ftp_user.first.c_str(), ftp_user.second.c_str());
+	::fclose(file);
 }
 
 
@@ -571,6 +499,76 @@ inline static void add_user(decltype(*ftp_users.begin())& ftp_user)
 		MG_INFO(("[FTP] Adding user \"%s\" to ftp server...", ftp_user.first.c_str()));
 		ftp_server.addUser(ftp_user.first, ftp_user.second, root_dir, fineftp::Permission::All);
 	}
+}
+
+
+
+inline static consteval size_t static_strlen(const char* str)
+{
+	size_t len = 0;
+	for (; *str; ++len, ++str);
+	return len;
+}
+
+inline bool starts_with(const char* str, const char* prefix)
+{
+	for (; *prefix; ++prefix, ++str)
+		if (*prefix != *str)
+			return false;
+	return true;
+}
+
+inline std::string getcwd()
+{
+	char cwd[PATH_MAX]{ };
+	getcwd(cwd, PATH_MAX);
+	cwd[PATH_MAX - 1] = 0;
+	std::string cwdstr(cwd);
+	return std::move(cwdstr);
+}
+
+
+inline std::string erase_all(const std::string& str, const std::string& seq)
+{
+	std::string res(str, 0, seq.size());
+	res.reserve(str.size()); // optional, avoids buffer reallocations in the loop
+	for (size_t i = seq.size(); i < str.size(); ++i)
+	{
+		bool ok = false;
+		for (int j = seq.size() - 1, k = i; j >= 0; --j, --k)
+			if (seq[j] != str[k])
+			{
+				ok = true;
+				break;
+			}
+		if (ok) res += str[i];
+	}
+	return std::move(res);
+}
+
+inline std::string secure_path(const std::string& path)
+{
+	std::string res = erase_all(path, "../");
+	return erase_all(res, "/..");
+}
+
+
+inline std::string path_dirname(const std::string& path)
+{
+	if (path.empty()) return "";
+	size_t slash = path.find_last_of('/');
+	if (slash == std::string::npos) return "";
+	return std::move(path.substr(0, slash));
+}
+
+
+inline std::string path_basename(std::string path)
+{
+	if (path.empty()) return "";
+	while (path.ends_with('/')) path.pop_back();
+	size_t slash = path.find_last_of('/');
+	if (slash == std::string::npos) return "";
+	return std::move(path.substr(slash + 1));
 }
 
 
@@ -611,7 +609,7 @@ static void static_resource_send(struct mg_connection* c, int ev, void* ev_data,
 
 inline void http_send_resource_file(struct mg_connection* connection, struct mg_http_message* msg, const char* rcdata, size_t rcsize)
 {
-	char etag[64], tmp[MG_PATH_MAX];
+	char etag[64]{ };
 	time_t mtime = 0;
 	struct mg_str* inm = nullptr;
 	
@@ -624,7 +622,7 @@ inline void http_send_resource_file(struct mg_connection* connection, struct mg_
 	else
 	{
 		int n, status = 200;
-		char range[100];
+		char range[100]{ };
 		int64_t r1 = 0, r2 = 0, cl = (int64_t)rcsize;
 		struct mg_str mime = MG_C_STR("image/x-icon");
 		
@@ -674,6 +672,7 @@ inline void http_send_resource_file(struct mg_connection* connection, struct mg_
 		}
 	}
 }
+
 
 inline void send_error_html(struct mg_connection* connection, int code, const char* color)
 {
