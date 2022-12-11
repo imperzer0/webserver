@@ -4,18 +4,17 @@
 pkgname=webserver
 pkgver=2.0
 pkgrel=1
-pkgdesc='Lightweight web server for archlinux available in container'
+pkgdesc='Lightweight c++ web server for archlinux with ftp'
 author="imperzer0"
 arch=('any')
 url=https://github.com/$author/$pkgname
 license=('GPL3')
-depends=('openssl' 'gcc' 'libzip')
-makedepends=('cmake' 'git' 'gcc' 'make' 'openssl' 'libzip')
+depends=('openssl' 'gcc')
+makedepends=('cmake' 'git' 'gcc' 'make' 'openssl')
 
 _srcprefix="local:/"
 _libfiles=("CMakeLists.txt" "main.cpp"
 	"server.cpp" "server.h" "constants.hpp"
-	"zip_dir.cpp" "zip_dir.h"
 	"config.cpp" "config.h"
 )
 

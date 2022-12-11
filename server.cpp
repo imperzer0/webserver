@@ -10,7 +10,6 @@
 #include "constants.hpp"
 #include "strscan.c"
 #include "resources.hpp"
-#include "zip_dir.h"
 #include "config.h"
 #include <fineftp/server.h>
 #include <map>

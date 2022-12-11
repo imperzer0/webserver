@@ -1,15 +1,8 @@
 # webserver
 
-Lightweight c++ web server for archlinux (available in docker container)
+Lightweight c++ web server for archlinux with ftp (available in docker container)
 
 ## Installation
-
-### From repository
-
-```bash
-git clone https://github.com/imperzer0/webserver.git
-cd webserver
-```
 
 #### Archlinux
 
@@ -25,7 +18,7 @@ docker build -t webserver .
 
 ## Usage
 
-### On ArchLinux
+### ArchLinux
 
 Open up terminal (in ```website``` directory) and run commands
 
@@ -35,10 +28,10 @@ cd /srv/webserver/
 webserver
 ```
 
-### In Docker
+### Docker
 
 Open up terminal (in ```website``` directory) and run commands
 
 ```bash
-docker run -dp 80:80 webserver
+docker run --network=host -d webserver
 ```
