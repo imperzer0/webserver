@@ -24,6 +24,7 @@
             </DockerPortBindingImpl>
           </list>
         </option>
+        <option name="commandLineOptions" value="--network=host" />
         <option name="sourceFilePath" value="Dockerfile" />
       </settings>
     </deployment>

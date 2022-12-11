@@ -2,7 +2,7 @@
 # Maintained by imper <imperator999mcpe@gmail.com>
 
 pkgname=webserver
-pkgver=1.2
+pkgver=2.0
 pkgrel=1
 pkgdesc='Lightweight web server for archlinux available in container'
 author="imperzer0"
