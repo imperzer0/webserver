@@ -35,7 +35,12 @@ RUN mkdir -p /srv/certs/
 EXPOSE 80 443 21
 
 WORKDIR /srv/certs/
-RUN /bin/bash -c "echo -e \"CASUBJ=\"/C=UA/ST=Ukraine/L=Zakarpattia/O=imperzer0/CN=CAwebserver\";\n\
+RUN /bin/bash -c "[[ \$([ ! -e /srv/certs/ca.key ]) || \
+                  \$([ ! -e /srv/certs/ca.pem ]) || \
+                  \$([ ! -e /srv/certs/cert.pem ]) || \
+                  \$([ ! -e /srv/certs/csr.pem ]) || \
+                  \$([ ! -e /srv/certs/key.pem ]) ]] && echo \"All files present\" && \
+                  echo -e \"CASUBJ=\"/C=UA/ST=Ukraine/L=Zakarpattia/O=imperzer0/CN=CAwebserver\";\n\
                             CRTSUBJ=\"/C=UA/ST=Ukraine/L=Zakarpattia/O=imperzer0/CN=CRTwebserver\";\n\
                             # Generate CA (Certificate Authority)\n\
                             openssl genrsa -out ca.key 2048;\n\
@@ -44,7 +49,7 @@ RUN /bin/bash -c "echo -e \"CASUBJ=\"/C=UA/ST=Ukraine/L=Zakarpattia/O=imperzer0/
                             openssl genrsa -out key.pem 2048;\n\
                             openssl req -new -key key.pem -out csr.pem -subj \\\$CRTSUBJ;\n\
                             openssl x509 -req -days 365 -in csr.pem -CA ca.pem -CAkey ca.key -set_serial 01 -out cert.pem;\"\
-                  > generator.bash; chmod +x generator.bash; bash generator.bash"
+                  > generator.bash && chmod +x generator.bash && bash generator.bash || exit 0"
 RUN ls -alshp
 
 WORKDIR /srv/webserver/
