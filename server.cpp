@@ -320,6 +320,9 @@ inline void handle_dir_html(struct mg_connection* connection, struct mg_http_mes
 	delete[] path;
 	
 	if (!spath.starts_with('/')) spath = "/" + spath;
+	mg_url_decode(spath.c_str(), spath.size(), spath.data(), spath.size(), 1);
+	spath = spath.data();
+	
 	std::string spath_full(cwd + spath);
 	
 	struct stat st{ };
