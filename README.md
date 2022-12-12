@@ -13,7 +13,7 @@ makepkg -sif
 #### Docker
 
 ```bash
-docker build -t webserver .
+docker build --rm -t webserver .
 ```
 
 ## Usage
@@ -33,5 +33,10 @@ webserver
 Open up terminal (in ```website``` directory) and run commands
 
 ```bash
-docker run --network=host -d webserver
+docker volume create webserver_certificates
+docker volume create webserver_data
+docker volume create webserver_etc
+docker run --network=host -v webserver_certificates:/srv/certs \
+           -v webserver_data:/srv/webserver \
+           -v webserver_etc:/etc --name webserver -d webserver
 ```
