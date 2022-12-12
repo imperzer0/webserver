@@ -320,13 +320,14 @@ inline void handle_dir_html(struct mg_connection* connection, struct mg_http_mes
 	delete[] path;
 	
 	if (!spath.starts_with('/')) spath = "/" + spath;
-	mg_url_decode(spath.c_str(), spath.size(), spath.data(), spath.size(), 1);
-	spath = spath.data();
 	
-	std::string spath_full(cwd + spath);
+	std::string sdpath(spath);
+	sdpath.reserve(sdpath.size() + 1);
+	mg_url_decode(sdpath.c_str(), sdpath.size(), sdpath.data(), sdpath.size() + 1, 0);
+	sdpath = sdpath.data();
 	
 	struct stat st{ };
-	if (::stat(spath_full.c_str(), &st) != 0)
+	if (::stat((cwd + sdpath).c_str(), &st) != 0)
 	{
 		send_error_html(connection, 404, "rgba(147, 0, 0, 0.90)");
 		return;
@@ -338,7 +339,7 @@ inline void handle_dir_html(struct mg_connection* connection, struct mg_http_mes
 	if (st.st_size > MAX_INLINE_FILE_SIZE)
 	{
 		extra_header = "Content-Disposition: attachment; filename=\"";
-		extra_header += path_basename(spath.c_str());
+		extra_header += path_basename(sdpath.c_str());
 		extra_header += "\"\r\n";
 		
 		opts.extra_headers = extra_header.c_str();
