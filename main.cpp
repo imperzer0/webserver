@@ -51,7 +51,7 @@ inline static void help()
 
 int main(int argc, char** argv)
 {
-	int option_index, option, destroy_db = 0;
+	int option_index, option;
 	while ((option = ::getopt_long(argc, argv, short_args, long_args, &option_index)) > 0)
 	{
 		switch (option)
@@ -66,8 +66,7 @@ int main(int argc, char** argv)
 				tls_path = ::strdup(optarg);
 				break;
 			case 'l':
-				log_level = ::strtol(::strdup(optarg), nullptr, 10);
-				break;
+				log_level = ::strtol(optarg, nullptr, 10);
 			case 'H':
 				hexdump = 1;
 				break;
