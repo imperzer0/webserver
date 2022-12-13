@@ -307,6 +307,100 @@ inline void handle_favicon_html(struct mg_connection* connection, struct mg_http
 	http_send_resource_file(connection, msg, reinterpret_cast<const char*>(favicon_ico), favicon_ico_len);
 }
 
+static void list_dir(struct mg_connection* c, struct mg_http_message* hm, const struct mg_http_serve_opts* opts, char* dir)
+{
+	const char* sort_js_code =
+			"<script>function srt(tb, sc, so, d) {"
+			"var tr = Array.prototype.slice.call(tb.rows, 0),"
+			"tr = tr.sort(function (a, b) { var c1 = a.cells[sc], c2 = b.cells[sc],"
+			"n1 = c1.getAttribute('name'), n2 = c2.getAttribute('name'), "
+			"t1 = a.cells[2].getAttribute('name'), "
+			"t2 = b.cells[2].getAttribute('name'); "
+			"return so * (t1 < 0 && t2 >= 0 ? -1 : t2 < 0 && t1 >= 0 ? 1 : "
+			"n1 ? parseInt(n2) - parseInt(n1) : "
+			"c1.textContent.trim().localeCompare(c2.textContent.trim())); });";
+	const char* sort_js_code2 =
+			"for (var i = 0; i < tr.length; i++) tb.appendChild(tr[i]); "
+			"if (!d) window.location.hash = ('sc=' + sc + '&so=' + so); "
+			"};"
+			"window.onload = function() {"
+			"var tb = document.getElementById('tb');"
+			"var m = /sc=([012]).so=(1|-1)/.exec(window.location.hash) || [0, 2, 1];"
+			"var sc = m[1], so = m[2]; document.onclick = function(ev) { "
+			"var c = ev.target.rel; if (c) {if (c == sc) so *= -1; srt(tb, c, so); "
+			"sc = c; ev.preventDefault();}};"
+			"srt(tb, sc, so, true);"
+			"}"
+			"</script>";
+	struct mg_fs* fs = opts->fs == nullptr ? &mg_fs_posix : opts->fs;
+	struct printdirentrydata d = { c, hm, opts, dir };
+	char tmp[10], buf[MG_PATH_MAX];
+	size_t off, n;
+	int len = mg_url_decode(hm->uri.ptr, hm->uri.len, buf, sizeof(buf), 0);
+	struct mg_str uri = len > 0 ? mg_str_n(buf, (size_t)len) : hm->uri;
+	
+	mg_printf(
+			c,
+			"HTTP/1.1 200 OK\r\n"
+			"Content-Type: text/html; charset=utf-8\r\n"
+			"%s"
+			"Content-Length:         \r\n\r\n",
+			opts->extra_headers == nullptr ? "" : opts->extra_headers
+	);
+	off = c->send.len;  // Start of body
+	mg_printf(
+			c,
+			"<!DOCTYPE html><html><head><title>Index of %.*s</title>%s%s"
+			"<style>body, html { margin: 0; padding: 0; }\n table { margin: 10px; }\n"
+			"h1 { margin: 10px; font-family: monospace; }\n th,td {text-align: left; padding-right: 1em;"
+			"font-family: monospace; font-size: 1rem; }\n .navbar { background-color: #333; overflow: hidden;"
+			"position: fixed; bottom: 0; width: 100%; font-family: monospace; font-size: 1rem; border-radius: 10px 10px 0 0; }\n"
+			".navbar a { float: left; display: block; color: #f2f2f2; text-align: center; padding: 14px 16px; text-decoration: none;"
+			"font-size: 17px; border-radius: 10px; }\n .navbar a:hover { background: #f1f1f1; color: black; }\n"
+			".navbar a:active { background: #04AA6D; color: black; }</style></head>"
+			"<body> <div class=\"navbar\"> <a href=\"/\">Go back</a> </div>"
+			"<h1>Index of %.*s</h1> <table cellpadding=\"0\"> <thead>"
+			"<tr> <th> <a href=\"#\" rel=\"0\">Name</a> </th>"
+			"<th> <a href=\"#\" rel=\"1\">Modified</a> </th>"
+			"<th> <a href=\"#\" rel=\"2\">Size</a> </th> </tr>"
+			"<tr> <td colspan=\"3\"> <hr> </td> </tr>"
+			"</thead>"
+			"<tbody id=\"tb\">\n",
+			(int)uri.len, uri.ptr, sort_js_code, sort_js_code2, (int)uri.len, uri.ptr
+	);
+	mg_printf(
+			c, "%s",
+			"  <tr><td><a href=\"..\">..</a></td>"
+			"<td name=-1></td><td name=-1>[DIR]</td></tr>\n"
+	);
+	
+	fs->ls(dir, printdirentry, &d);
+	mg_printf(c, "</tbody><tfoot><tr><td colspan=\"3\"><hr></td></tr></tfoot> </table></body></html>\n");
+	n = mg_snprintf(tmp, sizeof(tmp), "%lu", (unsigned long)(c->send.len - off));
+	if (n > sizeof(tmp)) n = 0;
+	memcpy(c->send.buf + off - 12, tmp, n);  // Set content length
+	c->is_resp = 0;                          // Mark response end
+}
+
+void serve_dir(struct mg_connection* c, struct mg_http_message* hm, const struct mg_http_serve_opts* opts)
+{
+	char path[MG_PATH_MAX];
+	const char* sp = opts->ssi_pattern;
+	int flags = uri_to_path(c, hm, opts, path, sizeof(path));
+	if (flags < 0)
+		return; // Do nothing: the response has already been sent by uri_to_path()
+	
+	if (flags & MG_FS_DIR)
+	{
+		list_dir(c, hm, opts, path);
+		return;
+	}
+	
+	if (flags && sp != nullptr && mg_globmatch(sp, strlen(sp), path, strlen(path)))
+		mg_http_serve_ssi(c, opts->root_dir, path);
+	else
+		mg_http_serve_file(c, hm, path, opts);
+}
 
 inline void handle_dir_html(struct mg_connection* connection, struct mg_http_message* msg)
 {
@@ -360,7 +454,7 @@ inline void handle_dir_html(struct mg_connection* connection, struct mg_http_mes
 	for (size_t i = 0; i < MG_MAX_HTTP_HEADERS; ++i)
 		msg2.headers[i] = msg->headers[i];
 	
-	mg_http_serve_dir(connection, &msg2, &opts);
+	serve_dir(connection, &msg2, &opts);
 }
 
 
