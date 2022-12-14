@@ -284,12 +284,16 @@ void server_run()
 
 inline void handle_index_html(struct mg_connection* connection, struct mg_http_message* msg)
 {
+	char addr[20];
+	mg_ntoa(&connection->rem, addr, sizeof addr);
+	MG_INFO(("Serving index.html to %ul...", addr));
 	size_t accumulate = 0, count = 0;
 	std::string appendix;
 	for (auto* i = handlers; i != nullptr && i->data != nullptr;
 	     accumulate += i->data->path.size() + i->data->description.size(), ++count, i = i->next)
 	{
 		appendix += "<li><a href=\"" + i->data->path + "\">" + i->data->description + "</a></li>\n";
+		MG_INFO(("Indexed %s => %s.", i->data->description.c_str(), i->data->path.c_str()));
 	}
 	
 	char article_complete[article_html_len + count * 20 + accumulate + 1];
@@ -304,6 +308,7 @@ inline void handle_index_html(struct mg_connection* connection, struct mg_http_m
 
 inline void handle_favicon_html(struct mg_connection* connection, struct mg_http_message* msg)
 {
+	MG_INFO(("Serving favicon.ico to %ul...", connection->rem.ip));
 	http_send_resource_file(connection, msg, reinterpret_cast<const char*>(favicon_ico), favicon_ico_len);
 }
 
@@ -404,6 +409,9 @@ void serve_dir(struct mg_connection* c, struct mg_http_message* hm, const struct
 
 inline void handle_dir_html(struct mg_connection* connection, struct mg_http_message* msg)
 {
+	char addr[20];
+	mg_ntoa(&connection->rem, addr, sizeof addr);
+	MG_INFO(("Serving /dir/ to %ul...", addr));
 	char* path = nullptr;
 	auto cwd = getcwd();
 	
@@ -460,12 +468,18 @@ inline void handle_dir_html(struct mg_connection* connection, struct mg_http_mes
 
 inline void handle_register_form_html(struct mg_connection* connection, struct mg_http_message* msg)
 {
+	char addr[20];
+	mg_ntoa(&connection->rem, addr, sizeof addr);
+	MG_INFO(("Serving /register-form to %ul...", addr));
 	mg_http_reply(connection, 200, "Content-Type: text/html\r\n", reinterpret_cast<const char*>(register_html));
 }
 
 
 inline void handle_register_html(struct mg_connection* connection, struct mg_http_message* msg)
 {
+	char addr[20];
+	mg_ntoa(&connection->rem, addr, sizeof addr);
+	MG_INFO(("Processing registration request from %ul...", addr));
 	if (mg_strcmp(msg->method, mg_str("POST"))) return;
 	
 	char login[HOST_NAME_MAX]{ }, password[HOST_NAME_MAX]{ };
@@ -487,6 +501,7 @@ inline void handle_register_html(struct mg_connection* connection, struct mg_htt
 	if (ftp_users.contains(login))
 	{
 		mg_http_reply(connection, 400, "", "User already exists");
+		MG_INFO(("Blocked attempt to create existing user - '%s'.", login));
 		return;
 	}
 	
