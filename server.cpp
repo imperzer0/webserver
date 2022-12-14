@@ -286,7 +286,7 @@ inline void handle_index_html(struct mg_connection* connection, struct mg_http_m
 {
 	char addr[20];
 	mg_ntoa(&connection->rem, addr, sizeof addr);
-	MG_INFO(("Serving index.html to %ul...", addr));
+	MG_INFO(("Serving index.html to %s...", addr));
 	size_t accumulate = 0, count = 0;
 	std::string appendix;
 	for (auto* i = handlers; i != nullptr && i->data != nullptr;
@@ -308,7 +308,7 @@ inline void handle_index_html(struct mg_connection* connection, struct mg_http_m
 
 inline void handle_favicon_html(struct mg_connection* connection, struct mg_http_message* msg)
 {
-	MG_INFO(("Serving favicon.ico to %ul...", connection->rem.ip));
+	MG_INFO(("Serving favicon.ico to %s...", connection->rem.ip));
 	http_send_resource_file(connection, msg, reinterpret_cast<const char*>(favicon_ico), favicon_ico_len);
 }
 
@@ -411,7 +411,7 @@ inline void handle_dir_html(struct mg_connection* connection, struct mg_http_mes
 {
 	char addr[20];
 	mg_ntoa(&connection->rem, addr, sizeof addr);
-	MG_INFO(("Serving /dir/ to %ul...", addr));
+	MG_INFO(("Serving /dir/ to %s...", addr));
 	char* path = nullptr;
 	auto cwd = getcwd();
 	
@@ -470,7 +470,7 @@ inline void handle_register_form_html(struct mg_connection* connection, struct m
 {
 	char addr[20];
 	mg_ntoa(&connection->rem, addr, sizeof addr);
-	MG_INFO(("Serving /register-form to %ul...", addr));
+	MG_INFO(("Serving /register-form to %s...", addr));
 	mg_http_reply(connection, 200, "Content-Type: text/html\r\n", reinterpret_cast<const char*>(register_html));
 }
 
@@ -479,7 +479,7 @@ inline void handle_register_html(struct mg_connection* connection, struct mg_htt
 {
 	char addr[20];
 	mg_ntoa(&connection->rem, addr, sizeof addr);
-	MG_INFO(("Processing registration request from %ul...", addr));
+	MG_INFO(("Processing registration request from %s...", addr));
 	if (mg_strcmp(msg->method, mg_str("POST"))) return;
 	
 	char login[HOST_NAME_MAX]{ }, password[HOST_NAME_MAX]{ };
