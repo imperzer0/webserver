@@ -125,6 +125,7 @@ inline void handle_register_html(struct mg_connection* connection, struct mg_htt
 /// Add path handler to global linked list
 void register_path_handler(const std::string& path, const std::string& description, path_handler_function fn)
 {
+	MG_INFO(("Registering '%s' => '%s' path...", description.c_str(), path.c_str()));
 	if (!handlers_head)
 	{
 		handlers = new registered_path_handlers{
@@ -144,13 +145,17 @@ void register_path_handler(const std::string& path, const std::string& descripti
 /// Iterate through registered handlers and try handle them
 inline void handle_registered_paths(struct mg_connection* connection, struct mg_http_message* msg)
 {
+	MG_INFO(("Handling non-builtin registered paths..."));
 	registered_path_handlers* root = handlers;
 	
 	while (root && root->data && !starts_with(msg->uri.ptr, root->data->path.c_str()))
 		root = root->next;
 	
 	if (root && root->data)
+	{
+		MG_INFO(("Handling '%s' => '%s' path...", root->data->description.c_str(), root->data->path.c_str()));
 		return root->data->fn(connection, msg);
+	}
 	
 	send_error_html(connection, 404, "rgba(147, 0, 0, 0.90)");
 }
@@ -293,7 +298,7 @@ inline void handle_index_html(struct mg_connection* connection, struct mg_http_m
 	     accumulate += i->data->path.size() + i->data->description.size(), ++count, i = i->next)
 	{
 		appendix += "<li><a href=\"" + i->data->path + "\">" + i->data->description + "</a></li>\n";
-		MG_INFO(("Indexed %s => %s.", i->data->description.c_str(), i->data->path.c_str()));
+		MG_INFO(("Indexed '%s' => '%s'.", i->data->description.c_str(), i->data->path.c_str()));
 	}
 	
 	char article_complete[article_html_len + count * 20 + accumulate + 1];
