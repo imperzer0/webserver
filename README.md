@@ -38,5 +38,5 @@ docker volume create webserver_data
 docker volume create webserver_etc
 docker run --network=host -v webserver_certificates:/srv/certs \
            -v webserver_data:/srv/webserver \
-           -v webserver_etc:/etc --name webserver -d webserver
+           -v webserver_etc:/etc --name webserver -it webserver
 ```
