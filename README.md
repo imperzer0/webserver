@@ -58,7 +58,7 @@ Then navigate to ```website``` directory and run commands
 ```bash
 sudo mkdir -p /srv/webserver/
 cd /srv/webserver/
-webserver --email="<account>@gmail.com" --email-password="<password>"
+webserver --tls /srv/certs/ --email="<account>@gmail.com" --email-password="<password>"
 ```
 
 ### Docker
