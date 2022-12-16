@@ -24,6 +24,7 @@ _rcfiles=(
 	"resources/index.html"
 	"resources/article.html"
 	"resources/register.html"
+	"resources/confirm.html"
 )
 
 _ftpfiles=(
