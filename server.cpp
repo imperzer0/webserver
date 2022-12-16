@@ -24,7 +24,7 @@ const char* https_address = DEFAULT_HTTPS_SERVER_ADDRESS;
 const char* tls_path = nullptr;
 const char* server_confirmator_email = nullptr;
 const char* server_confirmator_email_password = nullptr;
-const char* server_confirmator_smtp_server = "smtps://smtp-relay.gmail.com:465";
+const char* server_confirmator_smtp_server = "smtps://smtp.gmail.com:465";
 int log_level = 2, hexdump = 0;
 
 static struct mg_mgr manager{ };
@@ -229,7 +229,11 @@ void server_initialize()
 	
 	if (server_confirmator_email == nullptr || *server_confirmator_email == 0)
 	{
+		puts("[Server] ======= Important information ======");
 		puts("[Server] Confirmator email was not specified. Entering unsafe mode!!!");
+		puts("[Server] !!! Pay attention! Your server could be vulnerable to spam attack! !!!");
+		puts("[Server] Please, consider creating a google account and setup it for email verification.");
+		puts("[Server] ======= Important information ======");
 		delete[] server_confirmator_email;
 		delete[] server_confirmator_email_password;
 		server_confirmator_email = server_confirmator_email_password = nullptr;
@@ -519,31 +523,26 @@ inline void send_confirmation_notification_page_html(struct mg_connection* conne
 	mg_http_reply(connection, 200, "Content-Type: text/html\r\n", reinterpret_cast<const char*>(confirm_html));
 }
 
+typedef struct
+{
+	std::string message;
+	size_t pos;
+} MessageData;
+
 // Callback function that provides the data for the email message
 static size_t custom_curl_read_callback(void* buffer, size_t size, size_t nmemb, void* instream)
 {
-	if ((size == 0) || (nmemb == 0) || ((size * nmemb) < 1))
-	{
+	auto* upload = (MessageData*)instream;
+	
+	if ((size == 0) || (nmemb == 0) || ((size * nmemb) < 1) || upload->pos >= upload->message.size())
 		return 0;
-	}
 	
-	auto* upload = (std::string*)instream;
-	const char* email = upload->c_str();
+	size_t len = std::min(upload->message.size() - upload->pos, size * nmemb);
 	
-	if (email)
-	{
-		size_t len = strlen(email);
-		if (len > size * nmemb)
-		{
-			return (CURL_READFUNC_ABORT);
-		}
-		memcpy(buffer, email, len);
-		
-		return len;
-	}
+	memcpy(buffer, upload->message.c_str() + upload->pos, size * nmemb);
+	upload->pos += len;
 	
-	return 0;
-	
+	return len;
 }
 
 inline id_t generate_id_and_send_email(struct mg_connection* connection, const std::string& email)
@@ -587,7 +586,8 @@ inline id_t generate_id_and_send_email(struct mg_connection* connection, const s
 	curl_easy_setopt(curl, CURLOPT_MAIL_RCPT, recipients);
 	
 	curl_easy_setopt(curl, CURLOPT_READFUNCTION, custom_curl_read_callback);
-	curl_easy_setopt(curl, CURLOPT_READDATA, &message);
+	MessageData data{ .message = message, .pos = 0 };
+	curl_easy_setopt(curl, CURLOPT_READDATA, &data);
 	curl_easy_setopt(curl, CURLOPT_UPLOAD, 1L);
 	curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
 	

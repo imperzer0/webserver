@@ -14,40 +14,40 @@ makedepends=('cmake' 'git' 'gcc' 'make' 'openssl' 'curl')
 
 _srcprefix="local:/"
 _libfiles=("CMakeLists.txt" "main.cpp"
-	"server.cpp" "server.h" "constants.hpp"
-	"config.cpp" "config.h"
+  "server.cpp" "server.h" "constants.hpp"
+  "config.cpp" "config.h"
 )
 
 _rcfiles=(
-	"resources/error.html"
-	"resources/favicon.ico"
-	"resources/index.html"
-	"resources/article.html"
-	"resources/register.html"
-	"resources/confirm.html"
+  "resources/error.html"
+  "resources/favicon.ico"
+  "resources/index.html"
+  "resources/article.html"
+  "resources/register.html"
+  "resources/confirm.html"
 )
 
 _ftpfiles=(
-	"Findasio.cmake.patch"
-	"PKGBUILD.fineftp"
+  "Findasio.cmake.patch"
+  "PKGBUILD.fineftp"
 )
 
 # shellcheck disable=SC2068
 for _libfile in ${_libfiles[@]}; do
-	source=(${source[@]} "$_srcprefix/$_libfile")
-	sha512sums=(${sha512sums[@]} "SKIP")
+  source=(${source[@]} "$_srcprefix/$_libfile")
+  sha512sums=(${sha512sums[@]} "SKIP")
 done
 
 # shellcheck disable=SC2068
 for _rcfile in ${_rcfiles[@]}; do
-	source=(${source[@]} "$_srcprefix/$_rcfile")
-	sha512sums=(${sha512sums[@]} "SKIP")
+  source=(${source[@]} "$_srcprefix/$_rcfile")
+  sha512sums=(${sha512sums[@]} "SKIP")
 done
 
 # shellcheck disable=SC2068
 for _ftpfile in ${_ftpfiles[@]}; do
-	source=(${source[@]} "$_srcprefix/$_ftpfile")
-	sha512sums=(${sha512sums[@]} "SKIP")
+  source=(${source[@]} "$_srcprefix/$_ftpfile")
+  sha512sums=(${sha512sums[@]} "SKIP")
 done
 
 external=(${external[@]} "https://raw.githubusercontent.com/cesanta/mongoose/0a265e79a67d7bfcdca27f2ccb98ccb474677ec6/mongoose.c")
@@ -67,15 +67,15 @@ source=(${source[@]} ${external[@]})
 _package_version=" ("$pkgver"-"$pkgrel")"
 
 prepare() {
-	makepkg -sif --noconfirm -p PKGBUILD.fineftp
+  makepkg -sif --noconfirm -p PKGBUILD.fineftp
 }
 
 build() {
-	cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++ \
-		-DPACKAGE_VERSION="$_package_version" -DAPPNAME="$pkgname" .
-	make -j 8
+  cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++ \
+    -DPACKAGE_VERSION="$_package_version" -DAPPNAME="$pkgname" .
+  make -j 8
 }
 
 package() {
-	install -Dm755 $pkgname "$pkgdir/usr/bin/$pkgname"
+  install -Dm755 $pkgname "$pkgdir/usr/bin/$pkgname"
 }
