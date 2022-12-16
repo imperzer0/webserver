@@ -15,6 +15,9 @@
 extern const char* http_address;
 extern const char* https_address;
 extern const char* tls_path;
+extern const char* server_confirmator_email;
+extern const char* server_confirmator_email_password;
+extern const char* server_confirmator_smtp_server;
 extern int log_level, hexdump;
 
 extern void server_initialize();

@@ -10,8 +10,10 @@
         @import url(https://fonts.googleapis.com/css?family=Inconsolata);
 
         .login-page {
-            width: 100%;
-            padding-top: 8%;
+            width: auto;
+            max-width: 100%;
+            max-height: 100%;
+            padding: 8%;
             margin: 0;
         }
 
@@ -19,9 +21,9 @@
             position: relative;
             z-index: 1;
             background: #484848;
-            width: 300px;
-            margin: auto;
-            padding: 25px;
+            width: auto;
+            margin: 0;
+            padding: 5%;
             text-align: center;
             box-shadow: 0 0 20px 0 rgba(0, 0, 0, 0.2), 0 5px 5px 0 rgba(0, 0, 0, 0.24);
         }
@@ -117,43 +119,9 @@
 <body>
 <div class="login-page">
     <div class="form">
-        <h2 style="font-family: 'Inconsolata', monospace; color: #fff;">Register FTP user</h2>
-        <br/>
-        <form class="register-form" method="POST" action="/register">
-            <input id="login-field" type="text" placeholder="login" name="login"/>
-            <input id="email-field" type="text" placeholder="email" name="email"/>
-            <input id="password-field" type="password" placeholder="password" name="password"/>
-            <input id="password-repeat-field" type="password" placeholder="repeat password"/>
-            <input type="submit" value="register" onclick="return check_form()"/>
-        </form>
+        <h2 style="font-family: 'Inconsolata', monospace; color: #fff;">Confirm your account. Check email you provided for registration.</h2>
     </div>
 </div>
 <div class="navbar"><a href="/">Go back</a></div>
 </body>
-<script type="text/javascript">
-    function check_form() {
-        let x;
-        x = document.getElementById("login-field").value;
-        if (x === "") {
-            alert("Login must not be empty");
-            return false;
-        }
-        x = document.getElementById("email-field").value;
-        if (!/^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/.test(x))
-        {
-            alert("Invalid email format");
-            return false;
-        }
-        x = document.getElementById("password-field").value;
-        if (x === "") {
-            alert("Password must not be empty");
-            return false;
-        }
-        let y = document.getElementById("password-repeat-field").value;
-        if (x !== y) {
-            alert("Passwords are different");
-            return false;
-        }
-    }
-</script>
 </html>

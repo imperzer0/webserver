@@ -2,15 +2,15 @@
 # Maintained by imper <imperator999mcpe@gmail.com>
 
 pkgname=webserver
-pkgver=2.4
+pkgver=2.5
 pkgrel=1
 pkgdesc='Lightweight c++ web server for archlinux with ftp'
 author="imperzer0"
 arch=('any')
 url=https://github.com/$author/$pkgname
 license=('GPL3')
-depends=('openssl' 'gcc')
-makedepends=('cmake' 'git' 'gcc' 'make' 'openssl')
+depends=('openssl' 'gcc' 'curl')
+makedepends=('cmake' 'git' 'gcc' 'make' 'openssl' 'curl')
 
 _srcprefix="local:/"
 _libfiles=("CMakeLists.txt" "main.cpp"

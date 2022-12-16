@@ -29,6 +29,7 @@ set(resource_files
         "index.html"
         "article.html"
         "register.html"
+        "confirm.html"
         )
 
 # Creates C resources file from files in given directory
@@ -78,4 +79,4 @@ set(CMAKE_VERBOSE_MAKEFILE on)
 
 add_executable(webserver main.cpp server.cpp config.cpp)
 
-target_link_libraries(webserver pthread ssl crypto fineftp-server)
+target_link_libraries(webserver pthread ssl crypto fineftp-server curl)

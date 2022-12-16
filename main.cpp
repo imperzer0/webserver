@@ -9,16 +9,19 @@
 #include <getopt.h>
 
 
-static constexpr const char* short_args = "t:l:Hvh";
+static constexpr const char* short_args = "t:l:m:M:s:Hvh";
 static constexpr struct option long_args[] = {
-		{ "http_address",  required_argument, nullptr, 10 },
-		{ "https_address", required_argument, nullptr, 11 },
-		{ "tls",           required_argument, nullptr, 't' },
-		{ "loglevel",      required_argument, nullptr, 'l' },
-		{ "hexdump",       no_argument,       nullptr, 'H' },
-		{ "version",       no_argument,       nullptr, 'v' },
-		{ "help",          no_argument,       nullptr, 'h' },
-		{ nullptr, 0,                         nullptr, 0 }
+		{ "http_address",   required_argument, nullptr, 10 },
+		{ "https_address",  required_argument, nullptr, 11 },
+		{ "tls",            required_argument, nullptr, 't' },
+		{ "loglevel",       required_argument, nullptr, 'l' },
+		{ "email",          required_argument, nullptr, 'm' },
+		{ "email-password", required_argument, nullptr, 'M' },
+		{ "smtp-server",    required_argument, nullptr, 's' },
+		{ "hexdump",        no_argument,       nullptr, 'H' },
+		{ "version",        no_argument,       nullptr, 'v' },
+		{ "help",           no_argument,       nullptr, 'h' },
+		{ nullptr, 0,                          nullptr, 0 }
 };
 
 
@@ -28,13 +31,16 @@ inline static void help()
 	::printf("Usage: " APPNAME " [OPTIONS]...\n");
 	::printf("Runs http server.\n");
 	::printf("Options:\n");
-	::printf(" --http_address  |    <ip address>  Listening http_address. Default: %s\n", http_address);
-	::printf(" --https_address |    <ip address>  Listening https_address. Default: %s\n", https_address);
-	::printf(" --tls           | t  <path>        Path to ssl keypair directory. If not specified - no tls.\n");
-	::printf(" --loglevel      | l  <level>       Set log level (from 0 to 4). Default: %d\n", log_level);
-	::printf(" --hexdump       | H                Enable hex dump.\n");
-	::printf(" --version       | v                Show version information.\n");
-	::printf(" --help          | h                Show this help message.\n\n");
+	::printf(" --http_address    |    <ip address>  Listening http_address. Default: %s\n", http_address);
+	::printf(" --https_address   |    <ip address>  Listening https_address. Default: %s\n", https_address);
+	::printf(" --tls             | t  <path>        Path to ssl keypair directory. If not specified - no tls.\n");
+	::printf(" --loglevel        | l  <level>       Set log level (from 0 to 4). Default: %d\n", log_level);
+	::printf(" --email           | m  <email>       Email for user registration confirmation.\n");
+	::printf(" --email-password  | M  <password>    Email's account password.\n");
+	::printf(" --smtp-server     | s  <ip address>  SMTP server api address.\n");
+	::printf(" --hexdump         | H                Enable hex dump.\n");
+	::printf(" --version         | v                Show version information.\n");
+	::printf(" --help            | h                Show this help message.\n\n");
 	::printf("* NOTE: To generate ssl certificates in specific folder run commands:\n");
 	::printf("CASUBJ=\"/C=UA/ST=Ukraine/L=Zakarpattia/O=imperzer0/CN=CAwebserver\";\n");
 	::printf("CRTSUBJ=\"/C=UA/ST=Ukraine/L=Zakarpattia/O=imperzer0/CN=CRTwebserver\";\n");
@@ -67,6 +73,12 @@ int main(int argc, char** argv)
 				break;
 			case 'l':
 				log_level = ::strtol(optarg, nullptr, 10);
+			case 'm':
+				server_confirmator_email = strdup(optarg);
+			case 'M':
+				server_confirmator_email_password = strdup(optarg);
+			case 's':
+				server_confirmator_smtp_server = strdup(optarg);
 			case 'H':
 				hexdump = 1;
 				break;

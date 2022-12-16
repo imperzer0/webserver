@@ -14,17 +14,24 @@
 #include <fineftp/server.h>
 #include <map>
 #include <ftw.h>
+#include <curl/curl.h>
 
+
+typedef id_t uint32_t;
 
 const char* http_address = DEFAULT_HTTP_SERVER_ADDRESS;
 const char* https_address = DEFAULT_HTTPS_SERVER_ADDRESS;
 const char* tls_path = nullptr;
+const char* server_confirmator_email = nullptr;
+const char* server_confirmator_email_password = nullptr;
+const char* server_confirmator_smtp_server = "smtps://smtp-relay.gmail.com:465";
 int log_level = 2, hexdump = 0;
 
 static struct mg_mgr manager{ };
 static struct mg_connection* http_server_connection = nullptr, * https_server_connection = nullptr;
 static fineftp::FtpServer ftp_server;
-static std::map<std::string, std::string> ftp_users;
+static std::map<std::string, std::pair<std::string, std::string>> ftp_users;
+static std::map<id_t, std::pair<std::string, std::pair<std::string, std::string>>> ftp_users_pending;
 
 // Handle interrupts, like Ctrl-C
 static int s_signo = 0;
@@ -114,11 +121,14 @@ inline void handle_favicon_html(struct mg_connection* connection, struct mg_http
 /// Handle filesystem access (serve directory)
 inline void handle_dir_html(struct mg_connection* connection, struct mg_http_message* msg);
 
-/// Handle filesystem access (serve directory)
+/// Handle user registration form access
 inline void handle_register_form_html(struct mg_connection* connection, struct mg_http_message* msg);
 
-/// Handle filesystem access (serve directory)
+/// Handle user registration request
 inline void handle_register_html(struct mg_connection* connection, struct mg_http_message* msg);
+
+/// Handle user email confirmation request
+inline void handle_confirm_html(struct mg_connection* connection, struct mg_http_message* msg);
 
 
 
@@ -174,6 +184,8 @@ inline void handle_http_message(struct mg_connection* connection, struct mg_http
 		handle_register_form_html(connection, msg);
 	else if (mg_http_match_uri(msg, "/register"))
 		handle_register_html(connection, msg);
+	else if (starts_with(msg->uri.ptr, "/confirm/"))
+		handle_confirm_html(connection, msg);
 	else handle_registered_paths(connection, msg);
 }
 
@@ -209,6 +221,23 @@ void client_handler(struct mg_connection* connection, int ev, void* ev_data, voi
 /// Initialize server
 void server_initialize()
 {
+	if (server_confirmator_email != nullptr && server_confirmator_email_password == nullptr)
+	{
+		puts("[Server] Error occurred in server initialization: Confirmator email's password was not specified.");
+		exit(-3);
+	}
+	
+	if (server_confirmator_email == nullptr || *server_confirmator_email == 0)
+	{
+		puts("[Server] Confirmator email was not specified. Entering unsafe mode!!!");
+		delete[] server_confirmator_email;
+		delete[] server_confirmator_email_password;
+		server_confirmator_email = server_confirmator_email_password = nullptr;
+	}
+	
+	// Initialize the libcurl library
+	curl_global_init(CURL_GLOBAL_ALL);
+	
 	signal(SIGINT, signal_handler);
 	signal(SIGTERM, signal_handler);
 	signal(SIGABRT, signal_handler);
@@ -313,7 +342,9 @@ inline void handle_index_html(struct mg_connection* connection, struct mg_http_m
 
 inline void handle_favicon_html(struct mg_connection* connection, struct mg_http_message* msg)
 {
-	MG_INFO(("Serving favicon.ico to %s...", connection->rem.ip));
+	char addr[20];
+	mg_ntoa(&connection->rem, addr, sizeof addr);
+	MG_INFO(("Serving favicon.ico to %s...", addr));
 	http_send_resource_file(connection, msg, reinterpret_cast<const char*>(favicon_ico), favicon_ico_len);
 }
 
@@ -480,6 +511,101 @@ inline void handle_register_form_html(struct mg_connection* connection, struct m
 }
 
 
+inline void send_confirmation_notification_page_html(struct mg_connection* connection)
+{
+	char addr[20];
+	mg_ntoa(&connection->rem, addr, sizeof addr);
+	MG_INFO(("Sending email confirmation page to %s...", addr));
+	mg_http_reply(connection, 200, "Content-Type: text/html\r\n", reinterpret_cast<const char*>(confirm_html));
+}
+
+// Callback function that provides the data for the email message
+static size_t custom_curl_read_callback(void* buffer, size_t size, size_t nmemb, void* instream)
+{
+	if ((size == 0) || (nmemb == 0) || ((size * nmemb) < 1))
+	{
+		return 0;
+	}
+	
+	auto* upload = (std::string*)instream;
+	const char* email = upload->c_str();
+	
+	if (email)
+	{
+		size_t len = strlen(email);
+		if (len > size * nmemb)
+		{
+			return (CURL_READFUNC_ABORT);
+		}
+		memcpy(buffer, email, len);
+		
+		return len;
+	}
+	
+	return 0;
+	
+}
+
+inline id_t generate_id_and_send_email(struct mg_connection* connection, const std::string& email)
+{
+	char addr[20];
+	mg_ntoa(&connection->loc, addr, sizeof addr);
+	
+	id_t id = random();
+	for (int i = 0; id == 0 || ftp_users_pending.contains(id) && i < 10; ++i) id = random();
+	if (ftp_users_pending.contains(id))
+		return 0;
+	
+	// Set up the curl handle
+	CURL* curl = curl_easy_init();
+	
+	if (!curl)
+	{
+		MG_ERROR(("[Send Email] Unable to initialize curl."));
+		return 0;
+	}
+	
+	// Set the SMTP server and port
+	curl_easy_setopt(curl, CURLOPT_URL, server_confirmator_smtp_server);
+	
+	// Set the username and password for authentication
+	curl_easy_setopt(curl, CURLOPT_USERNAME, server_confirmator_email);
+	curl_easy_setopt(curl, CURLOPT_PASSWORD, server_confirmator_email_password);
+	
+	// Define email message
+	std::string message = "To: " + email + "\r\n" +
+	                      "From: " + server_confirmator_email + "\r\n" +
+	                      "Subject: Confirm registration of new account\r\n"
+	                      "\r\n"
+	                      "To complete registration open link "
+	                      "http://" + std::string(addr) + "/confirm/" + std::to_string(id) +
+	                      " in any available browser.";
+	
+	struct curl_slist* recipients = nullptr;
+	curl_easy_setopt(curl, CURLOPT_MAIL_FROM, server_confirmator_email);
+	recipients = curl_slist_append(recipients, email.c_str());
+	curl_easy_setopt(curl, CURLOPT_MAIL_RCPT, recipients);
+	
+	curl_easy_setopt(curl, CURLOPT_READFUNCTION, custom_curl_read_callback);
+	curl_easy_setopt(curl, CURLOPT_READDATA, &message);
+	curl_easy_setopt(curl, CURLOPT_UPLOAD, 1L);
+	curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
+	
+	// Send the email
+	CURLcode res = curl_easy_perform(curl);
+	
+	// Check for errors
+	if (res != CURLE_OK)
+		MG_ERROR(("[Send Email] curl_easy_perform() failed: %s\n", curl_easy_strerror(res)));
+	
+	// Clean up
+	curl_slist_free_all(recipients);
+	curl_easy_cleanup(curl);
+	curl_global_cleanup();
+	
+	return id;
+}
+
 inline void handle_register_html(struct mg_connection* connection, struct mg_http_message* msg)
 {
 	char addr[20];
@@ -487,8 +613,9 @@ inline void handle_register_html(struct mg_connection* connection, struct mg_htt
 	MG_INFO(("Processing registration request from %s...", addr));
 	if (mg_strcmp(msg->method, mg_str("POST"))) return;
 	
-	char login[HOST_NAME_MAX]{ }, password[HOST_NAME_MAX]{ };
+	char login[HOST_NAME_MAX]{ }, email[HOST_NAME_MAX]{ }, password[HOST_NAME_MAX]{ };
 	mg_http_get_var(&msg->body, "login", login, sizeof(login));
+	mg_http_get_var(&msg->body, "email", email, sizeof(email));
 	mg_http_get_var(&msg->body, "password", password, sizeof(password));
 	
 	if (login[0] == 0)
@@ -497,7 +624,13 @@ inline void handle_register_html(struct mg_connection* connection, struct mg_htt
 		return;
 	}
 	
-	if (password[0] == 0)
+	if (email[0] == 0)
+	{
+		mg_http_reply(connection, 400, "", "Email is required");
+		return;
+	}
+	
+	if (password[0] == 0 || strlen(password) < 8)
 	{
 		mg_http_reply(connection, 400, "", "Password is required and must be at least 8 characters long");
 		return;
@@ -510,9 +643,88 @@ inline void handle_register_html(struct mg_connection* connection, struct mg_htt
 		return;
 	}
 	
-	ftp_users[login] = password;
+	if (server_confirmator_email == nullptr)
+	{
+		auto user = ftp_users.insert({ login, { email, password } });
+		if (!user.second)
+		{
+			mg_http_reply(connection, 400, "", "Cant insert user");
+			return;
+		}
+		
+		save_users();
+		add_user(*user.first);
+		mg_http_reply(connection, 200, "", "Success");
+	}
+	else
+	{
+		id_t id = generate_id_and_send_email(connection, email);
+		if (id == 0)
+		{
+			mg_http_reply(connection, 500, "", "Can't register new user");
+			return;
+		}
+		
+		ftp_users_pending[id] = { login, { email, password } };
+		send_confirmation_notification_page_html(connection);
+	}
+}
+
+
+inline void handle_confirm_html(struct mg_connection* connection, struct mg_http_message* msg)
+{
+	if (server_confirmator_email == nullptr)
+	{
+		send_error_html(connection, 404, "rgba(147, 0, 0, 0.90)");
+		return;
+	}
+	
+	char addr[20];
+	mg_ntoa(&connection->rem, addr, sizeof addr);
+	MG_INFO(("Processing confirmation request from %s...", addr));
+	if (mg_strcmp(msg->method, mg_str("GET"))) return;
+	
+	char* id_ptr = nullptr;
+	
+	std::string uri(msg->uri.ptr, msg->uri.len);
+	strscanf(uri.c_str(), "/confirm/%s", &id_ptr);
+	
+	std::string id_str(secure_path(id_ptr ? id_ptr : ""));
+	delete[] id_ptr;
+	
+	id_t id = 0;
+	try
+	{
+		id = std::stoul(id_str);
+	}
+	catch (...)
+	{
+		mg_http_reply(connection, 400, "", "Invalid link");
+		return;
+	}
+	
+	if (id == 0)
+	{
+		mg_http_reply(connection, 400, "", "Invalid link");
+		return;
+	}
+	
+	auto pending_user = ftp_users_pending.find(id);
+	if (pending_user == ftp_users_pending.end())
+	{
+		mg_http_reply(connection, 400, "", "Invalid link");
+		return;
+	}
+	
+	auto user = ftp_users.insert(pending_user->second);
+	if (!user.second)
+	{
+		mg_http_reply(connection, 400, "", "Cant insert user");
+		return;
+	}
+	
 	save_users();
-	add_user(*ftp_users.find(login));
+	add_user(*user.first);
 	mg_http_reply(connection, 200, "", "Success");
 }
 
@@ -570,9 +782,10 @@ inline static void load_users()
 		while (!::feof(file))
 		{
 			char username[HOST_NAME_MAX + 1]{ };
-			char password[200]{ };
-			if (::fscanf(file, "%s : %s\n", username, password) == 2) // Scan line in format "<user> : <password>\n"
-				ftp_users[username] = password; // Store username and password
+			char email[HOST_NAME_MAX + 1]{ };
+			char password[HOST_NAME_MAX + 1]{ };
+			if (::fscanf(file, "%s : %s : %s\n", username, email, password) == 3) // Scan line in format "<user> : <password>\n"
+				ftp_users[username] = { email, password }; // Store username and password
 		}
 		::fclose(file);
 	}
@@ -585,7 +798,10 @@ inline static void save_users()
 	if (!file)
 		return;
 	for (auto& ftp_user : ftp_users)
-		::fprintf(file, "%s : %s\n", ftp_user.first.c_str(), ftp_user.second.c_str());
+		::fprintf(
+				file, "%s : %s : %s\n",
+				ftp_user.first.c_str(), ftp_user.second.first.c_str(), ftp_user.second.second.c_str()
+		);
 	::fclose(file);
 }
 
@@ -601,7 +817,7 @@ inline static void forward_all_users()
 		if (mkdir_p(root_dir.c_str()))
 		{
 			MG_INFO(("[FTP] Adding user \"%s\" to ftp server...", ftp_user.first.c_str()));
-			ftp_server.addUser(ftp_user.first, ftp_user.second, root_dir, fineftp::Permission::All);
+			ftp_server.addUser(ftp_user.first, ftp_user.second.second, root_dir, fineftp::Permission::All);
 		}
 	}
 }
@@ -614,7 +830,7 @@ inline static void add_user(decltype(*ftp_users.begin())& ftp_user)
 	if (mkdir_p(root_dir.c_str()))
 	{
 		MG_INFO(("[FTP] Adding user \"%s\" to ftp server...", ftp_user.first.c_str()));
-		ftp_server.addUser(ftp_user.first, ftp_user.second, root_dir, fineftp::Permission::All);
+		ftp_server.addUser(ftp_user.first, ftp_user.second.second, root_dir, fineftp::Permission::All);
 	}
 }
 
