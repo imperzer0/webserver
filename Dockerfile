@@ -7,7 +7,7 @@
 
 FROM archlinux AS build
 
-RUN pacman -Sy base-devel --noconfirm
+RUN pacman -Sy base-devel --noconfirm --needed
 
 RUN useradd -mg users -G wheel -s /bin/bash webserver
 RUN echo '%wheel ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
@@ -26,7 +26,7 @@ FROM archlinux
 RUN mkdir -p /pack/
 COPY --from=build /webserver/*.pkg.tar.zst /pack/
 WORKDIR /pack/
-RUN pacman -Sy vim nano
+RUN pacman -Sy vim nano --needed
 RUN pacman -U *.pkg.tar.zst --noconfirm
 
 RUN mkdir -p /srv/webserver/
@@ -57,7 +57,7 @@ RUN ls -alshp
 
 RUN ["/bin/bash", "-c", "echo -e 'cd /srv/webserver/;\n/bin/webserver $@;' > /script.bash; chmod +x /script.bash"]
 
-#RUN pacman -Sy openssh gdb rsync --noconfirm
+#RUN pacman -Sy openssh gdb rsync --noconfirm --needed
 #EXPOSE 2222
 #RUN /usr/bin/ssh-keygen -A
 #RUN echo -e "Port 2222\n\
