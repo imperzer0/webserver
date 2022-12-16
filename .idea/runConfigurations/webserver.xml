@@ -1,5 +1,5 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="webserver" type="CMakeRunConfiguration" factoryName="Application" PROGRAM_PARAMS="--http_address=:1488" REDIRECT_INPUT="false" ELEVATE="true" USE_EXTERNAL_CONSOLE="false" PASS_PARENT_ENVS_2="true" PROJECT_NAME="webserver" TARGET_NAME="webserver" CONFIG_NAME="Debug" RUN_TARGET_PROJECT_NAME="webserver" RUN_TARGET_NAME="webserver">
+  <configuration default="false" name="webserver" type="CMakeRunConfiguration" factoryName="Application" PROGRAM_PARAMS="--http_address=:1488 --smtp-server=smtp-relay.gmail.com --email=imperator999mcpe@gmail.com --email-password=ukbovukzfvdfxlwc" REDIRECT_INPUT="false" ELEVATE="true" USE_EXTERNAL_CONSOLE="false" PASS_PARENT_ENVS_2="true" PROJECT_NAME="webserver" TARGET_NAME="webserver" CONFIG_NAME="Debug" RUN_TARGET_PROJECT_NAME="webserver" RUN_TARGET_NAME="webserver">
     <method v="2">
       <option name="com.jetbrains.cidr.execution.CidrBuildBeforeRunTaskProvider$BuildBeforeRunTask" enabled="true" />
     </method>

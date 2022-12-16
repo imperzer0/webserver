@@ -73,26 +73,26 @@ int main(int argc, char** argv)
 				break;
 			case 'l':
 				log_level = ::strtol(optarg, nullptr, 10);
+				break;
 			case 'm':
 				server_confirmator_email = strdup(optarg);
+				break;
 			case 'M':
 				server_confirmator_email_password = strdup(optarg);
+				break;
 			case 's':
 				server_confirmator_smtp_server = strdup(optarg);
+				break;
 			case 'H':
 				hexdump = 1;
 				break;
 			case 'v':
-			{
 				::printf(APPNAME "version: " VERSION "\n");
 				help();
 				break;
-			}
 			case 'h':
-			{
 				help();
 				break;
-			}
 			default:
 				help();
 		}
