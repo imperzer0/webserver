@@ -26,7 +26,7 @@ FROM archlinux
 RUN mkdir -p /pack/
 COPY --from=build /webserver/*.pkg.tar.zst /pack/
 WORKDIR /pack/
-RUN pacman -Sy vim nano --needed
+RUN pacman -Sy vim nano --noconfirm --needed
 RUN pacman -U *.pkg.tar.zst --noconfirm
 
 RUN mkdir -p /srv/webserver/
