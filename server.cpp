@@ -545,10 +545,14 @@ static size_t custom_curl_read_callback(void* buffer, size_t size, size_t nmemb,
 	return len;
 }
 
-inline id_t generate_id_and_send_email(struct mg_connection* connection, const std::string& email)
+inline id_t generate_id_and_send_email(struct mg_connection* connection, struct mg_http_message* msg, const std::string& email)
 {
-	char addr[20];
-	mg_ntoa(&connection->loc, addr, sizeof addr);
+	auto server_address = mg_http_get_header(msg, "Host");
+	
+	if (server_address == nullptr)
+		return 0;
+	
+	std::string server_address_str(server_address->ptr, server_address->len);
 	
 	id_t id = random();
 	for (int i = 0; id == 0 || ftp_users_pending.contains(id) && i < 10; ++i) id = random();
@@ -577,9 +581,8 @@ inline id_t generate_id_and_send_email(struct mg_connection* connection, const s
 	                      "Subject: Confirm registration of new account\r\n"
 	                      "\r\n"
 	                      "To complete registration open link "
-	                      "http://" + std::string(addr) + "/confirm/" + std::to_string(id) +
-	                      " or "
-	                      "https://" + std::string(addr) + "/confirm/" + std::to_string(id) +
+	                      "http" + std::string(connection->is_tls ? "s" : "") +
+	                      "://" + server_address_str + "/confirm/" + std::to_string(id) +
 	                      " in any available browser.";
 	
 	struct curl_slist* recipients = nullptr;
@@ -660,7 +663,7 @@ inline void handle_register_html(struct mg_connection* connection, struct mg_htt
 	}
 	else
 	{
-		id_t id = generate_id_and_send_email(connection, email);
+		id_t id = generate_id_and_send_email(connection, msg, email);
 		if (id == 0)
 		{
 			mg_http_reply(connection, 500, "", "Can't register new user");
