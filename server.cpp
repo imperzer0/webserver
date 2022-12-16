@@ -578,6 +578,8 @@ inline id_t generate_id_and_send_email(struct mg_connection* connection, const s
 	                      "\r\n"
 	                      "To complete registration open link "
 	                      "http://" + std::string(addr) + "/confirm/" + std::to_string(id) +
+	                      " or "
+	                      "https://" + std::string(addr) + "/confirm/" + std::to_string(id) +
 	                      " in any available browser.";
 	
 	struct curl_slist* recipients = nullptr;
