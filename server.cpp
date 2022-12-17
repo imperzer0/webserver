@@ -554,6 +554,8 @@ inline id_t generate_id_and_send_email(struct mg_connection* connection, struct 
 	
 	std::string server_address_str(server_address->ptr, server_address->len);
 	
+	srandom(mg_millis());
+	
 	id_t id = random();
 	for (int i = 0; id == 0 || ftp_users_pending.contains(id) && i < 10; ++i) id = random();
 	if (ftp_users_pending.contains(id))
