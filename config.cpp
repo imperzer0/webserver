@@ -9,7 +9,7 @@
 #include "config.h"
 
 
-/// Register user-defined path handlers
+/// Register user-defined path ftp_handlers
 void register_additional_handlers()
 {
 	// TODO: Create your handlers here
@@ -17,6 +17,13 @@ void register_additional_handlers()
 	// register_path_handler(
 	// 		"PATH", "DESCRIPTION",
 	// 		[](struct mg_connection* connection, struct mg_http_message* msg)
+	// 		{
+	//
+	// 		}
+	// );
+	//
+	// add_custom_ftp_handler(
+	// 		[](const std::string& ftp_command, const std::string& parameters)
 	// 		{
 	//
 	// 		}

@@ -2,7 +2,7 @@
 # Maintained by imper <imperator999mcpe@gmail.com>
 
 pkgname=webserver
-pkgver=2.5
+pkgver=2.6
 pkgrel=1
 pkgdesc='Lightweight c++ web server for archlinux with ftp'
 author="imperzer0"
@@ -13,7 +13,8 @@ depends=('openssl' 'gcc' 'curl')
 makedepends=('cmake' 'git' 'gcc' 'make' 'openssl' 'curl')
 
 _srcprefix="local:/"
-_libfiles=("CMakeLists.txt" "main.cpp"
+_libfiles=(
+  "CMakeLists.txt" "main.cpp"
   "server.cpp" "server.h" "constants.hpp"
   "config.cpp" "config.h"
 )
@@ -30,6 +31,9 @@ _rcfiles=(
 _ftpfiles=(
   "Findasio.cmake.patch"
   "PKGBUILD.fineftp"
+  "custom_event_handler.hpp"
+  "ftp_event_handler.h"
+  "ftp_session.cpp.patch"
 )
 
 # shellcheck disable=SC2068

@@ -3,34 +3,47 @@
 
 pkgname=fineftp-server
 pkgver=1.3.3
-pkgrel=1
+pkgrel=2
 pkgdesc="FineFTP is a minimal FTP server library for Windows and Unix flavors"
 arch=('any')
-url="https://github.com/continental/fineftp-server"
+url="https://github.com/eclipse-ecal/fineftp-server"
 license=('MIT')
 depends=('asio')
 makedepends=()
 optdepends=()
-source=(https://github.com/eclipse-ecal/fineftp-server/archive/v$pkgver.tar.gz
-	Findasio.cmake.patch)
-sha512sums=('788d6e17a58c365dc5a320065d2b95f5b046d8bec57def2016b46e450e6ec0f142dd6faaec64004fba5f67af1545f4724567721e3ae576195711de349f91be47'
-	'5a157af2c9cf573c2649ffecc99edba86383985c5adaba2ad318098c2709e907147c8ce5c359d423b04e60f237e37c3f81d59daaa0a4a7146245e668aa801865')
+source=(
+  "https://github.com/eclipse-ecal/fineftp-server/archive/v$pkgver.tar.gz"
+  "Findasio.cmake.patch"
+  "custom_event_handler.hpp"
+  "ftp_event_handler.h"
+  "ftp_session.cpp.patch"
+)
+sha512sums=(
+  '788d6e17a58c365dc5a320065d2b95f5b046d8bec57def2016b46e450e6ec0f142dd6faaec64004fba5f67af1545f4724567721e3ae576195711de349f91be47'
+  '5a157af2c9cf573c2649ffecc99edba86383985c5adaba2ad318098c2709e907147c8ce5c359d423b04e60f237e37c3f81d59daaa0a4a7146245e668aa801865'
+  'acee1cbf67ce735649afaadd13b0e873b3ac57ce297c0319678f81d3d4e6e52d95c38573e3084e3db0195c029d9104d85b2a6234fec443b68f049c9c1f8b0f6b'
+  'edbbe04eccc56c1d60225e9534931f97ad57403948610c0439c377410c34ebad682be49dd227ea2dd543000b8fd80808ca1f695f9b50512b68d4a4d080171f71'
+  'a280e3932561e484f451f7031d15c43b39078daa888da74e5641df9d2016a0eef90dfc2f03e9e8f349468792b2f59e8fbfa3a0ccdecc9dd4ccf5373945823530'
+)
 
 prepare() {
-	patch --forward --strip=1 --input="../Findasio.cmake.patch" "$pkgname-$pkgver/cmake/Findasio.cmake"
+  patch --forward --strip=1 --input="Findasio.cmake.patch" "$pkgname-$pkgver/cmake/Findasio.cmake"
+  patch --forward --strip=1 --input="ftp_session.cpp.patch" "$pkgname-$pkgver/fineftp-server/src/ftp_session.cpp"
+  cp -fv "custom_event_handler.hpp" "$pkgname-$pkgver/fineftp-server/src/"
+  cp -fv "ftp_event_handler.h" "$pkgname-$pkgver/fineftp-server/src/"
 }
 
 build() {
-	cd $pkgname-$pkgver
-	mkdir -p _build
-	cd _build
-	cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr
-	make -j 8
+  cd $pkgname-$pkgver
+  mkdir -p _build
+  cd _build
+  cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr
+  make -j 8
 }
 
 package() {
-	cd $pkgname-$pkgver
-	install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
-	cd _build
-	DESTDIR="$pkgdir" make install
+  cd $pkgname-$pkgver
+  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+  cd _build
+  DESTDIR="$pkgdir" make install
 }
