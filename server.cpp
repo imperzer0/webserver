@@ -45,14 +45,6 @@ static void signal_handler(int signo)
 
 typedef struct
 {
-	const char* data;
-	uint64_t len;
-	uint64_t pos;
-} str_buf_fd;
-
-
-typedef struct
-{
 	std::string path;
 	std::string description;
 	path_handler_function fn;
@@ -105,8 +97,10 @@ inline static void forward_all_users();
 inline static void add_user(decltype(*ftp_users.begin())& ftp_user);
 
 
-/// Send resource string as regular file over http
-inline void http_send_resource_file(struct mg_connection* connection, struct mg_http_message* msg, const char* rcdata, size_t rcsize);
+/// Send icon resource string as regular file over http
+inline void http_send_resource(
+		struct mg_connection* connection, struct mg_http_message* msg, const char* rcdata, size_t rcsize, const char* mime_type
+);
 
 /// Send error page over http
 inline void send_error_html(struct mg_connection* connection, int code, const char* color);
@@ -349,8 +343,9 @@ inline void handle_favicon_html(struct mg_connection* connection, struct mg_http
 	char addr[20];
 	mg_ntoa(&connection->rem, addr, sizeof addr);
 	MG_INFO(("Serving favicon.ico to %s...", addr));
-	http_send_resource_file(connection, msg, reinterpret_cast<const char*>(favicon_ico), favicon_ico_len);
+	http_send_resource(connection, msg, reinterpret_cast<const char*>(favicon_ico), favicon_ico_len, "image/x-icon");
 }
+
 
 static void list_dir(struct mg_connection* c, struct mg_http_message* hm, const struct mg_http_serve_opts* opts, char* dir)
 {
@@ -912,42 +907,9 @@ inline std::string path_basename(std::string path)
 }
 
 
-static void restore_http_cb_rp(struct mg_connection* c)
-{
-	delete (str_buf_fd*)c->pfn_data;
-	c->pfn_data = nullptr;
-	c->pfn = http_cb;
-	c->is_resp = 0;
-}
-
-static void static_resource_send(struct mg_connection* c, int ev, void* ev_data, void* fn_data)
-{
-	if (ev == MG_EV_WRITE || ev == MG_EV_POLL)
-	{
-		auto rc = (str_buf_fd*)fn_data;
-		
-		// Read to send IO buffer directly, avoid extra on-stack buffer
-		size_t max = MG_IO_SIZE, space, * cl = (size_t*)c->label;
-		if (c->send.size < max)
-			mg_iobuf_resize(&c->send, max);
-		if (c->send.len >= c->send.size)
-			return;  // Rate limit
-		if ((space = c->send.size - c->send.len) > *cl)
-			space = *cl;
-		
-		memcpy(c->send.buf + c->send.len, &rc->data[rc->pos], space);
-		rc->pos += space;
-		c->send.len += space;
-		*cl -= space;
-		if (space == 0) restore_http_cb_rp(c);
-	}
-	else if (ev == MG_EV_CLOSE)
-	{
-		restore_http_cb_rp(c);
-	}
-}
-
-inline void http_send_resource_file(struct mg_connection* connection, struct mg_http_message* msg, const char* rcdata, size_t rcsize)
+inline void http_send_resource(
+		struct mg_connection* connection, struct mg_http_message* msg, const char* rcdata, size_t rcsize, const char* mime_type
+)
 {
 	char etag[64]{ };
 	time_t mtime = 0;
@@ -964,7 +926,7 @@ inline void http_send_resource_file(struct mg_connection* connection, struct mg_
 		int n, status = 200;
 		char range[100]{ };
 		int64_t r1 = 0, r2 = 0, cl = (int64_t)rcsize;
-		struct mg_str mime = MG_C_STR("image/x-icon");
+		struct mg_str mime = MG_C_STR(mime_type);
 		
 		// Handle Range header
 		struct mg_str* rh = mg_http_get_header(msg, "Range");
@@ -1006,7 +968,48 @@ inline void http_send_resource_file(struct mg_connection* connection, struct mg_
 		}
 		else
 		{
-			connection->pfn = static_resource_send;
+			typedef struct
+			{
+				const char* data;
+				uint64_t len;
+				uint64_t pos;
+			} str_buf_fd;
+			
+			connection->pfn = [](struct mg_connection* c, int ev, void* ev_data, void* fn_data)
+			{
+				if (ev == MG_EV_WRITE || ev == MG_EV_POLL)
+				{
+					auto rc = (str_buf_fd*)fn_data;
+					
+					// Read to send IO buffer directly, avoid extra on-stack buffer
+					size_t max = MG_IO_SIZE, space, * cl = (size_t*)c->label;
+					if (c->send.size < max)
+						mg_iobuf_resize(&c->send, max);
+					if (c->send.len >= c->send.size)
+						return;  // Rate limit
+					if ((space = c->send.size - c->send.len) > *cl)
+						space = *cl;
+					
+					memcpy(c->send.buf + c->send.len, &rc->data[rc->pos], space);
+					rc->pos += space;
+					c->send.len += space;
+					*cl -= space;
+					if (space == 0)
+					{
+						delete (str_buf_fd*)c->pfn_data;
+						c->pfn_data = nullptr;
+						c->pfn = http_cb;
+						c->is_resp = 0;
+					}
+				}
+				else if (ev == MG_EV_CLOSE)
+				{
+					delete (str_buf_fd*)c->pfn_data;
+					c->pfn_data = nullptr;
+					c->pfn = http_cb;
+					c->is_resp = 0;
+				}
+			};
 			connection->pfn_data = new str_buf_fd{ .data = rcdata, .len = rcsize, .pos = 0 };
 			*(size_t*)connection->label = (size_t)cl;  // Track to-be-sent content length
 		}
