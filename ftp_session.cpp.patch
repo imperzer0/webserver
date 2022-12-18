@@ -10,7 +10,7 @@
      auto command_it = command_map.find(ftp_command);
      if (command_it != command_map.end())
      {
-+      execute_custom_ftp_handlers(ftp_command, parameters);
++      execute_custom_ftp_handlers(ftp_command, parameters, ftp_working_directory_, logged_in_user_);
        command_it->second(parameters);
        last_command_ = ftp_command;
      }

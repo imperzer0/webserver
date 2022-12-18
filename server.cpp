@@ -27,6 +27,8 @@ const char* server_confirmator_email_password = nullptr;
 const char* server_confirmator_smtp_server = "smtps://smtp.gmail.com:465";
 int log_level = 2, hexdump = 0;
 
+pthread_mutex_t ftp_callback_mutex = PTHREAD_MUTEX_INITIALIZER;
+
 static struct mg_mgr manager{ };
 static struct mg_connection* http_server_connection = nullptr, * https_server_connection = nullptr;
 static fineftp::FtpServer ftp_server;
@@ -43,13 +45,6 @@ static void signal_handler(int signo)
 }
 
 
-typedef struct
-{
-	std::string path;
-	std::string description;
-	path_handler_function fn;
-} registered_path_handler;
-
 typedef struct __registered_path_handlers
 {
 	registered_path_handler* data = nullptr;
@@ -58,6 +53,17 @@ typedef struct __registered_path_handlers
 
 static registered_path_handlers* handlers = nullptr;
 static registered_path_handlers* handlers_head = nullptr;
+
+
+mutex_locker::mutex_locker(pthread_mutex_t* mutex) : mutex(mutex)
+{
+	pthread_mutex_lock(mutex);
+}
+
+mutex_locker::~mutex_locker()
+{
+	pthread_mutex_unlock(mutex);
+}
 
 
 /// Return true if str starts with prefix
@@ -127,20 +133,23 @@ inline void handle_confirm_html(struct mg_connection* connection, struct mg_http
 
 
 /// Add path handler to global linked list
-void register_path_handler(const std::string& path, const std::string& description, path_handler_function fn)
+void register_path_handler(
+		const std::string& path, const std::string& description, path_handler_function fn,
+		decltype(registered_path_handler::restriction_type) type
+)
 {
 	MG_INFO(("Registering '%s' => '%s' path...", description.c_str(), path.c_str()));
 	if (!handlers_head)
 	{
 		handlers = new registered_path_handlers{
-				.data = new registered_path_handler{ .path = path, .description = description, .fn = fn },
+				.data = new registered_path_handler{ .path = path, .description = description, .fn = fn, .restriction_type = type },
 				.next = nullptr };
 		handlers_head = handlers;
 	}
 	else
 	{
 		handlers_head->next = new registered_path_handlers{
-				.data = new registered_path_handler{ .path = path, .description = description, .fn = fn },
+				.data = new registered_path_handler{ .path = path, .description = description, .fn = fn, .restriction_type = type },
 				.next = nullptr };
 		handlers_head = handlers_head->next;
 	}
@@ -152,12 +161,29 @@ inline void handle_registered_paths(struct mg_connection* connection, struct mg_
 	MG_INFO(("Handling non-builtin registered paths..."));
 	registered_path_handlers* root = handlers;
 	
-	while (root && root->data && !starts_with(msg->uri.ptr, root->data->path.c_str()))
+	while (root && root->data)
+	{
+		switch (root->data->restriction_type)
+		{
+			case registered_path_handler::STRICT:
+				if (mg_http_match_uri(msg, root->data->path.c_str()))
+					goto exit_loop;
+				break;
+			case registered_path_handler::SOFT:
+				if (starts_with(msg->uri.ptr, root->data->path.c_str()))
+					goto exit_loop;
+				break;
+		}
 		root = root->next;
+	}
+	
+	exit_loop:
 	
 	if (root && root->data)
 	{
-		MG_INFO(("Handling '%s' => '%s' path...", root->data->description.c_str(), root->data->path.c_str()));
+		char addr[20];
+		mg_ntoa(&connection->rem, addr, sizeof addr);
+		MG_INFO(("Handling '%s' => '%s' path for IP %s...", root->data->description.c_str(), root->data->path.c_str(), addr));
 		return root->data->fn(connection, msg);
 	}
 	
@@ -246,6 +272,20 @@ void server_initialize()
 	
 	mg_log_set(log_level);
 	mg_mgr_init(&manager);
+	
+	if (log_level >= 2)
+	{
+		add_custom_ftp_handler(
+				[](
+						const std::string& ftp_command, const std::string& parameters, const std::string& ftp_working_directory,
+						std::shared_ptr<::fineftp::FtpUser> ftp_user
+				)
+				{
+					mutex_locker l(&ftp_callback_mutex);
+					MG_INFO((" [FTP] %s %s", ftp_command.c_str(), parameters.c_str()));
+				}
+		);
+	}
 	
 	register_additional_handlers();
 	
@@ -572,15 +612,17 @@ inline id_t generate_id_and_send_email(struct mg_connection* connection, struct 
 	curl_easy_setopt(curl, CURLOPT_USERNAME, server_confirmator_email);
 	curl_easy_setopt(curl, CURLOPT_PASSWORD, server_confirmator_email_password);
 	
+	std::string link = "http" + std::string(connection->is_tls ? "s" : "") +
+	                   "://" + server_address_str + "/confirm/" + std::to_string(id);
+	
 	// Define email message
 	std::string message = "To: " + email + "\r\n" +
 	                      "From: " + server_confirmator_email + "\r\n" +
 	                      "Subject: Confirm registration of new account\r\n"
 	                      "\r\n"
-	                      "To complete registration open link "
-	                      "http" + std::string(connection->is_tls ? "s" : "") +
-	                      "://" + server_address_str + "/confirm/" + std::to_string(id) +
-	                      " in any available browser.";
+	                      "To complete registration open link " + link + " in any available browser.";
+	
+	MG_INFO(("Sending link [%s] to [%s]", link.c_str(), email.c_str()));
 	
 	struct curl_slist* recipients = nullptr;
 	curl_easy_setopt(curl, CURLOPT_MAIL_FROM, server_confirmator_email);

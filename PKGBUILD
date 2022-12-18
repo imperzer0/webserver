@@ -33,6 +33,7 @@ _ftpfiles=(
   "PKGBUILD.fineftp"
   "custom_event_handler.hpp"
   "ftp_event_handler.h"
+  "ftp_user.h"
   "ftp_session.cpp.patch"
 )
 

@@ -9,8 +9,15 @@
 #define FINEFTP_SERVER_FTP_EVENT_HANDLER_H
 
 #include <string>
+#include <memory>
+#include "ftp_user.h"
 
-typedef void (*ftp_event_handler_function)(const std::string& ftp_command, const std::string& parameters);
+
+typedef void
+(* ftp_event_handler_function)(
+		const std::string& ftp_command, const std::string& parameters, const std::string& ftp_working_directory,
+		std::shared_ptr<::fineftp::FtpUser> ftp_user
+);
 
 typedef struct event_handler
 {

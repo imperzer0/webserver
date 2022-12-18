@@ -15,12 +15,6 @@ event_handler* ftp_handlers = new event_handler;
 
 void add_custom_ftp_handler(ftp_event_handler_function handler)
 {
-	if (ftp_handlers->handler == nullptr)
-	{
-		ftp_handlers->handler = handler;
-		return;
-	}
-	
 	auto* it = ftp_handlers;
 	for (; it->handler != nullptr && it->next != nullptr; it = it->next);
 	
@@ -34,10 +28,13 @@ void add_custom_ftp_handler(ftp_event_handler_function handler)
 	}
 }
 
-void execute_custom_ftp_handlers(const std::string& ftp_command, const std::string& parameters)
+void execute_custom_ftp_handlers(
+		const std::string& ftp_command, const std::string& parameters, const std::string& ftp_working_directory,
+		std::shared_ptr<::fineftp::FtpUser> ftp_user
+)
 {
 	for (auto* it = ftp_handlers; it != nullptr && it->handler != nullptr; it = it->next)
-		ftp_handlers->handler(ftp_command, parameters);
+		it->handler(ftp_command, parameters, ftp_working_directory, ftp_user);
 }
 
 #endif //FINEFTP_SERVER_CUSTOM_EVENT_HANDLER_HPP
