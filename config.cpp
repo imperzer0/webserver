@@ -6,6 +6,7 @@
 
 
 #include <list>
+#include <filesystem>
 #include "server.h"
 #include "config.h"
 #include "resources.hpp"
@@ -54,6 +55,15 @@ inline std::string path_basename(std::string path)
 	return std::move(path.substr(slash + 1));
 }
 
+inline std::string getcwd()
+{
+	char cwd[PATH_MAX]{ };
+	getcwd(cwd, PATH_MAX);
+	cwd[PATH_MAX - 1] = 0;
+	std::string cwdstr(cwd);
+	return std::move(cwdstr);
+}
+
 
 /// Register user-defined path ftp_handlers
 void register_additional_handlers()
@@ -79,6 +89,17 @@ void register_additional_handlers()
 			"/dashboard", "View statistics on dashboard",
 			[](struct mg_connection* connection, struct mg_http_message* msg)
 			{
+				std::string appendix;
+				for (auto& f : statistics.recent_uploaded_files)
+				{
+					appendix += "<li><a href=\"/dir/" + f.second + "\">" + f.first + "</a></li>\n";
+					MG_INFO(("Indexed '%s' => '%s'.", f.first.c_str(), f.second.c_str()));
+				}
+				
+				mg_http_reply(
+						connection, 200, "", RESOURCE(dashboard_html),
+						statistics.recent_uploads_count, appendix.c_str()
+				);
 			}, registered_path_handler::STRICT
 	);
 	
@@ -121,7 +142,13 @@ void register_additional_handlers()
 								if (::stat(filepath.c_str(), &st) == 0 && S_ISREG(st.st_mode))
 								{
 									++statistics.recent_uploads_count;
-									statistics.recent_uploaded_files.push_front({ path_basename(filepath), filepath });
+									
+									filepath.erase(filepath.size() - 5); // remove .part additional extension
+									std::filesystem::path base(getcwd());
+									std::filesystem::path fpath(filepath);
+									statistics.recent_uploaded_files.push_front(
+											{ path_basename(filepath), std::filesystem::relative(fpath, base).string() }
+									);
 									while (statistics.recent_uploaded_files.size() > MAX_RECENT_UPLOAD_RECORDS_COUNT)
 										statistics.recent_uploaded_files.pop_back();
 								}

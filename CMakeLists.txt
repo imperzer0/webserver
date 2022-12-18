@@ -30,6 +30,9 @@ set(resource_files
         "article.html"
         "register.html"
         "confirm.html"
+        "dashboard.html"
+        "bootstrap.css"
+        "CascadiaMono.woff"
         )
 
 # Creates C resources file from files in given directory
@@ -39,7 +42,8 @@ function(create_resources output)
             "#ifndef WEBSERVER_RESOURCES_HPP\n"
             "#define WEBSERVER_RESOURCES_HPP\n"
             "\n"
-            " #define LEN(name) name##_len\n"
+            "#define LEN(name) name##_len\n"
+            "#define RESOURCE(rc) reinterpret_cast<const char*>(rc)"
             "\n")
     # Iterate through input files
     foreach (bin ${resource_files})

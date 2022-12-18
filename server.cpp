@@ -130,6 +130,9 @@ inline void handle_register_html(struct mg_connection* connection, struct mg_htt
 /// Handle user email confirmation request
 inline void handle_confirm_html(struct mg_connection* connection, struct mg_http_message* msg);
 
+/// Handle other resources request
+inline void handle_resources_html(struct mg_connection* connection, struct mg_http_message* msg);
+
 
 
 /// Add path handler to global linked list
@@ -206,6 +209,8 @@ inline void handle_http_message(struct mg_connection* connection, struct mg_http
 		handle_register_html(connection, msg);
 	else if (starts_with(msg->uri.ptr, "/confirm/"))
 		handle_confirm_html(connection, msg);
+	else if (starts_with(msg->uri.ptr, "/resources/"))
+		handle_resources_html(connection, msg);
 	else handle_registered_paths(connection, msg);
 }
 
@@ -368,12 +373,12 @@ inline void handle_index_html(struct mg_connection* connection, struct mg_http_m
 		MG_INFO(("Indexed '%s' => '%s'.", i->data->description.c_str(), i->data->path.c_str()));
 	}
 	
-	char article_complete[article_html_len + count * 20 + accumulate + 1];
-	sprintf(article_complete, reinterpret_cast<const char*>(article_html), appendix.c_str());
+	char article_complete[LEN(article_html) + count * 20 + accumulate + 1];
+	sprintf(article_complete, RESOURCE(article_html), appendix.c_str());
 	
 	mg_http_reply(
 			connection, 200, "Content-Type: text/html\r\n",
-			reinterpret_cast<const char*>(index_html), article_complete
+			RESOURCE(index_html), article_complete
 	);
 }
 
@@ -383,7 +388,7 @@ inline void handle_favicon_html(struct mg_connection* connection, struct mg_http
 	char addr[20];
 	mg_ntoa(&connection->rem, addr, sizeof addr);
 	MG_INFO(("Serving favicon.ico to %s...", addr));
-	http_send_resource(connection, msg, reinterpret_cast<const char*>(favicon_ico), favicon_ico_len, "image/x-icon");
+	http_send_resource(connection, msg, RESOURCE(favicon_ico), LEN(favicon_ico), "image/x-icon");
 }
 
 
@@ -431,13 +436,10 @@ static void list_dir(struct mg_connection* c, struct mg_http_message* hm, const 
 	mg_printf(
 			c,
 			"<!DOCTYPE html><html><head><title>Index of %.*s</title>%s%s"
+			"<link rel=\"stylesheet\" type=\"text/css\" href=\"/resources/bootstrap.css\"/>"
 			"<style>body, html { margin: 0; padding: 0; }\n table { margin: 10px; }\n"
-			"h1 { margin: 10px; font-family: monospace; }\n th,td {text-align: left; padding-right: 1em;"
-			"font-family: monospace; font-size: 1rem; }\n .navbar { background-color: #333; overflow: hidden;"
-			"position: fixed; bottom: 0; width: 100%; font-family: monospace; font-size: 1rem; border-radius: 10px 10px 0 0; }\n"
-			".navbar a { float: left; display: block; color: #f2f2f2; text-align: center; padding: 14px 16px; text-decoration: none;"
-			"font-size: 17px; border-radius: 10px; }\n .navbar a:hover { background: #f1f1f1; color: black; }\n"
-			".navbar a:active { background: #04AA6D; color: black; }</style></head>"
+			"h1 { margin: 10px; }\n th,td {text-align: left; padding-right: 1em;"
+			"font-size: 1rem; } </style></head>"
 			"<body> <div class=\"navbar\"> <a href=\"/\">Go back</a> </div>"
 			"<h1>Index of %.*s</h1> <table cellpadding=\"0\"> <thead>"
 			"<tr> <th> <a href=\"#\" rel=\"0\">Name</a> </th>"
@@ -546,7 +548,7 @@ inline void handle_register_form_html(struct mg_connection* connection, struct m
 	char addr[20];
 	mg_ntoa(&connection->rem, addr, sizeof addr);
 	MG_INFO(("Serving /register-form to %s...", addr));
-	mg_http_reply(connection, 200, "Content-Type: text/html\r\n", reinterpret_cast<const char*>(register_html));
+	mg_http_reply(connection, 200, "Content-Type: text/html\r\n", RESOURCE(register_html));
 }
 
 
@@ -555,7 +557,7 @@ inline void send_confirmation_notification_page_html(struct mg_connection* conne
 	char addr[20];
 	mg_ntoa(&connection->rem, addr, sizeof addr);
 	MG_INFO(("Sending email confirmation page to %s...", addr));
-	mg_http_reply(connection, 200, "Content-Type: text/html\r\n", reinterpret_cast<const char*>(confirm_html));
+	mg_http_reply(connection, 200, "Content-Type: text/html\r\n", RESOURCE(confirm_html));
 }
 
 typedef struct
@@ -773,6 +775,36 @@ inline void handle_confirm_html(struct mg_connection* connection, struct mg_http
 }
 
 
+inline void handle_resources_html(struct mg_connection* connection, struct mg_http_message* msg)
+{
+	char addr[20];
+	mg_ntoa(&connection->rem, addr, sizeof addr);
+	MG_INFO(("Processing /resources/ for %s...", addr));
+	
+	char* path = nullptr;
+	
+	std::string uri(msg->uri.ptr, msg->uri.len);
+	strscanf(uri.c_str(), "/resources/%s", &path);
+	
+	std::string path_s(path);
+	delete[] path;
+	
+	if (path_s == "bootstrap.css")
+	{
+		http_send_resource(connection, msg, RESOURCE(bootstrap_css), LEN(bootstrap_css), "text/css");
+		return;
+	}
+	
+	if (path_s == "CascadiaMono.woff")
+	{
+		http_send_resource(connection, msg, RESOURCE(CascadiaMono_woff), LEN(CascadiaMono_woff), "font/woff");
+		return;
+	}
+	
+	send_error_html(connection, 404, "rgba(147, 0, 0, 0.90)");
+}
+
+
 int unlink_cb(const char* fpath, const struct stat*, int, struct FTW*)
 {
 	int rv = remove(fpath);
@@ -953,116 +985,102 @@ inline void http_send_resource(
 		struct mg_connection* connection, struct mg_http_message* msg, const char* rcdata, size_t rcsize, const char* mime_type
 )
 {
-	char etag[64]{ };
-	time_t mtime = 0;
-	struct mg_str* inm = nullptr;
+	int n, status = 200;
+	char range[100]{ };
+	int64_t r1 = 0, r2 = 0, cl = (int64_t)rcsize;
+	struct mg_str mime = mg_str_s(mime_type);
 	
-	if (mg_http_etag(etag, sizeof(etag), rcsize, mtime) != nullptr &&
-	    (inm = mg_http_get_header(msg, "If-None-Match")) != nullptr &&
-	    mg_vcasecmp(inm, etag) == 0)
+	// Handle Range header
+	struct mg_str* rh = mg_http_get_header(msg, "Range");
+	range[0] = '\0';
+	if (rh != nullptr && (n = getrange(rh, &r1, &r2)) > 0 && r1 >= 0 && r2 >= 0)
 	{
-		mg_http_reply(connection, 304, nullptr, "");
-	}
-	else
-	{
-		int n, status = 200;
-		char range[100]{ };
-		int64_t r1 = 0, r2 = 0, cl = (int64_t)rcsize;
-		struct mg_str mime = MG_C_STR(mime_type);
-		
-		// Handle Range header
-		struct mg_str* rh = mg_http_get_header(msg, "Range");
-		range[0] = '\0';
-		if (rh != nullptr && (n = getrange(rh, &r1, &r2)) > 0 && r1 >= 0 && r2 >= 0)
+		// If range is specified like "400-", set second limit to content len
+		if (n == 1) r2 = cl - 1;
+		if (r1 > r2 || r2 >= cl)
 		{
-			// If range is specified like "400-", set second limit to content len
-			if (n == 1) r2 = cl - 1;
-			if (r1 > r2 || r2 >= cl)
-			{
-				status = 416;
-				cl = 0;
-				mg_snprintf(range, sizeof(range), "Content-Range: bytes */%lld\r\n", (int64_t)rcsize);
-			}
-			else
-			{
-				status = 206;
-				cl = r2 - r1 + 1;
-				mg_snprintf(range, sizeof(range), "Content-Range: bytes %lld-%lld/%lld\r\n", r1, r1 + cl - 1, (int64_t)rcsize);
-			}
-		}
-		mg_printf(
-				connection,
-				"HTTP/1.1 %d %s\r\n"
-				"Content-Type: %.*s\r\n"
-				"Etag: %s\r\n"
-				"Content-Length: %llu\r\n"
-				"%s\r\n",
-				status, mg_http_status_code_str(status),
-				(int)mime.len, mime.ptr,
-				etag,
-				cl,
-				range
-		);
-		if (mg_vcasecmp(&msg->method, "HEAD") == 0)
-		{
-			connection->is_draining = 1;
-			connection->is_resp = 0;
+			status = 416;
+			cl = 0;
+			mg_snprintf(range, sizeof(range), "Content-Range: bytes */%lld\r\n", (int64_t)rcsize);
 		}
 		else
 		{
-			typedef struct
-			{
-				const char* data;
-				uint64_t len;
-				uint64_t pos;
-			} str_buf_fd;
-			
-			connection->pfn = [](struct mg_connection* c, int ev, void* ev_data, void* fn_data)
-			{
-				if (ev == MG_EV_WRITE || ev == MG_EV_POLL)
-				{
-					auto rc = (str_buf_fd*)fn_data;
-					
-					// Read to send IO buffer directly, avoid extra on-stack buffer
-					size_t max = MG_IO_SIZE, space, * cl = (size_t*)c->label;
-					if (c->send.size < max)
-						mg_iobuf_resize(&c->send, max);
-					if (c->send.len >= c->send.size)
-						return;  // Rate limit
-					if ((space = c->send.size - c->send.len) > *cl)
-						space = *cl;
-					
-					memcpy(c->send.buf + c->send.len, &rc->data[rc->pos], space);
-					rc->pos += space;
-					c->send.len += space;
-					*cl -= space;
-					if (space == 0)
-					{
-						delete (str_buf_fd*)c->pfn_data;
-						c->pfn_data = nullptr;
-						c->pfn = http_cb;
-						c->is_resp = 0;
-					}
-				}
-				else if (ev == MG_EV_CLOSE)
-				{
-					delete (str_buf_fd*)c->pfn_data;
-					c->pfn_data = nullptr;
-					c->pfn = http_cb;
-					c->is_resp = 0;
-				}
-			};
-			connection->pfn_data = new str_buf_fd{ .data = rcdata, .len = rcsize, .pos = 0 };
-			*(size_t*)connection->label = (size_t)cl;  // Track to-be-sent content length
+			status = 206;
+			cl = r2 - r1 + 1;
+			mg_snprintf(range, sizeof(range), "Content-Range: bytes %lld-%lld/%lld\r\n", r1, r1 + cl - 1, (int64_t)rcsize);
 		}
 	}
+	mg_printf(
+			connection,
+			"HTTP/1.1 %d %s\r\n"
+			"Content-Type: %.*s\r\n"
+			"Content-Length: %llu\r\n"
+			"%s\r\n",
+			status, mg_http_status_code_str(status),
+			(int)mime.len, mime.ptr,
+			cl,
+			range
+	);
+	
+	if (mg_vcasecmp(&msg->method, "HEAD") == 0)
+	{
+		connection->is_draining = 1;
+		connection->is_resp = 0;
+		return;
+	}
+	
+	
+	typedef struct
+	{
+		const char* data;
+		uint64_t len;
+		uint64_t pos;
+	} str_buf_fd;
+	
+	connection->pfn = [](struct mg_connection* c, int ev, void* ev_data, void* fn_data)
+	{
+		if (ev == MG_EV_WRITE || ev == MG_EV_POLL)
+		{
+			auto rc = (str_buf_fd*)fn_data;
+			
+			// Read to send IO buffer directly, avoid extra on-stack buffer
+			size_t max = MG_IO_SIZE, space, * cl = (size_t*)c->label;
+			if (c->send.size < max)
+				mg_iobuf_resize(&c->send, max);
+			if (c->send.len >= c->send.size)
+				return;  // Rate limit
+			if ((space = c->send.size - c->send.len) > *cl)
+				space = *cl;
+			
+			memcpy(c->send.buf + c->send.len, &rc->data[rc->pos], space);
+			rc->pos += space;
+			c->send.len += space;
+			*cl -= space;
+			if (space == 0)
+			{
+				delete (str_buf_fd*)c->pfn_data;
+				c->pfn_data = nullptr;
+				c->pfn = http_cb;
+				c->is_resp = 0;
+			}
+		}
+		else if (ev == MG_EV_CLOSE)
+		{
+			delete (str_buf_fd*)c->pfn_data;
+			c->pfn_data = nullptr;
+			c->pfn = http_cb;
+			c->is_resp = 0;
+		}
+	};
+	connection->pfn_data = new str_buf_fd{ .data = rcdata, .len = rcsize, .pos = 0 };
+	*(size_t*)connection->label = (size_t)cl;  // Track to-be-sent content length
 }
 
 
 inline void send_error_html(struct mg_connection* connection, int code, const char* color)
 {
 	mg_http_reply(
-			connection, code, "Content-Type: text/html\r\n", reinterpret_cast<const char*>(error_html),
+			connection, code, "Content-Type: text/html\r\n", RESOURCE(error_html),
 			color, color, color, color, code, mg_http_status_code_str(code)
 	);
 }

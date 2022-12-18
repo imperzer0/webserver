@@ -6,9 +6,8 @@
           content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
     <title>Register on ftp server</title>
+    <link rel="stylesheet" type="text/css" href="/resources/bootstrap.css"/>
     <style type="text/css">
-        @import url(https://fonts.googleapis.com/css?family=Inconsolata);
-
         .login-page {
             width: 100%;
             padding-top: 8%;
@@ -19,15 +18,14 @@
             position: relative;
             z-index: 1;
             background: #484848;
-            width: 300px;
+            width: 450px;
             margin: auto;
-            padding: 25px;
+            padding: 50px;
             text-align: center;
             box-shadow: 0 0 20px 0 rgba(0, 0, 0, 0.2), 0 5px 5px 0 rgba(0, 0, 0, 0.24);
         }
 
         .form input {
-            font-family: "Inconsolata", monospace;
             outline: 0;
             background: #333333;
             color: #ffffff;
@@ -40,7 +38,6 @@
         }
 
         .form input[type=submit] {
-            font-family: "Inconsolata", monospace;
             font-weight: 700;
             text-transform: capitalize;
             outline: 0;
@@ -53,6 +50,7 @@
             -webkit-transition: all 0.3 ease;
             transition: all 0.3 ease;
             cursor: pointer;
+            margin-top: 20px;
         }
 
         .form input[type=submit]:hover, .form input[type=submit]:active, .form input[type=submit]:focus {
@@ -63,7 +61,6 @@
             background: #6b991f; /* fallback for old browsers */
             background: rgb(107, 153, 31);
             background: linear-gradient(120deg, #345631 10%, #083a00 75%);
-            font-family: "Inconsolata", monospace;
             -webkit-font-smoothing: antialiased;
             -moz-osx-font-smoothing: grayscale;
             margin: 0;
@@ -80,44 +77,11 @@
             max-height: 100%;
         }
     </style>
-    <style>
-        .navbar {
-            background-color: #333;
-            overflow: hidden;
-            position: fixed;
-            bottom: 0;
-            width: 100%;
-            font-family: monospace;
-            font-size: 1rem;
-            border-radius: 10px 10px 0 0;
-        }
-
-        .navbar a {
-            float: left;
-            display: block;
-            color: #f2f2f2;
-            text-align: center;
-            padding: 14px 16px;
-            text-decoration: none;
-            font-size: 17px;
-            border-radius: 10px;
-        }
-
-        .navbar a:hover {
-            background: #f1f1f1;
-            color: black;
-        }
-
-        .navbar a:active {
-            background: #04aa6d;
-            color: black;
-        }
-    </style>
 </head>
 <body>
 <div class="login-page">
     <div class="form">
-        <h2 style="font-family: 'Inconsolata', monospace; color: #fff;">Register FTP user</h2>
+        <h2 style="color: #fff;">Register FTP user</h2>
         <br/>
         <form class="register-form" method="POST" action="/register">
             <input id="login-field" type="text" placeholder="login" name="login"/>

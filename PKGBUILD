@@ -2,7 +2,7 @@
 # Maintained by imper <imperator999mcpe@gmail.com>
 
 pkgname=webserver
-pkgver=2.6
+pkgver=2.7
 pkgrel=1
 pkgdesc='Lightweight c++ web server for archlinux with ftp'
 author="imperzer0"
@@ -21,11 +21,12 @@ _libfiles=(
 
 _rcfiles=(
   "resources/error.html"
-  "resources/favicon.ico"
   "resources/index.html"
   "resources/article.html"
   "resources/register.html"
   "resources/confirm.html"
+  "resources/dashboard.html"
+  "resources/bootstrap.css"
 )
 
 _ftpfiles=(
@@ -54,6 +55,13 @@ for _ftpfile in ${_ftpfiles[@]}; do
   source=(${source[@]} "$_srcprefix/$_ftpfile")
   sha512sums=(${sha512sums[@]} "SKIP")
 done
+
+source=(${source[@]} "$_srcprefix/resources/favicon.ico")
+sha512sums=(${sha512sums[@]} "72850225ffda45dff7f87645e80512ddce302fec175df7adb0e6d8d91f5f5a2131250fe91510b35f19cf05c1d229aa9eb8f71594c918555acb0418f3c2975cff")
+
+source=(${source[@]} "$_srcprefix/resources/CascadiaMono.woff")
+sha512sums=(${sha512sums[@]} "180d3248b16d5d3ed3aca598eb67e7edb8ec8553c21edafe96d9d268989c0d7896a615c7e67527d1fca913308e1b24a363a59c7826b7e341012e853736db4fa6")
+
 
 external=(${external[@]} "https://raw.githubusercontent.com/cesanta/mongoose/0a265e79a67d7bfcdca27f2ccb98ccb474677ec6/mongoose.c")
 sha512sums=(${sha512sums[@]} "2fb2abd382aecc86ae4a9474fa8c40fe3f59e32cba20259d4588815f67d9658cbbe5f87a1b3eb18c5a8defe38becce5e38f1e08b35da2335a3e441e2346666e7")
