@@ -2,7 +2,7 @@
 # Maintained by imper <imperator999mcpe@gmail.com>
 
 pkgname=webserver
-pkgver=2.7
+pkgver=2.8
 pkgrel=1
 pkgdesc='Lightweight c++ web server for archlinux with ftp'
 author="imperzer0"

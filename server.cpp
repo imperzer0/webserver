@@ -41,6 +41,7 @@ static int s_signo = 0;
 static void signal_handler(int signo)
 {
 	MG_ERROR(("[SIGNAL_HANDLER] Captured SIG%s(%d) \"%s\".", sigabbrev_np(signo), signo, sigdescr_np(signo)));
+	signal(signo, SIG_DFL);
 	s_signo = signo;
 }
 
@@ -269,11 +270,7 @@ void server_initialize()
 	
 	signal(SIGINT, signal_handler);
 	signal(SIGTERM, signal_handler);
-	signal(SIGABRT, signal_handler);
-	signal(SIGKILL, signal_handler);
-	signal(SIGTERM, signal_handler);
 	signal(SIGQUIT, signal_handler);
-	signal(SIGHUP, signal_handler);
 	
 	mg_log_set(log_level);
 	mg_mgr_init(&manager);
@@ -355,6 +352,8 @@ void server_run()
 	mg_mgr_free(&manager);
 	ftp_server.stop();
 	MG_INFO(("Exiting due to signal [%d]...", s_signo));
+	
+	exit(s_signo);
 }
 
 
