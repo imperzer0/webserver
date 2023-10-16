@@ -12,6 +12,8 @@ license=('GPL3')
 depends=('openssl' 'gcc' 'curl')
 makedepends=('cmake' 'git' 'gcc' 'make' 'openssl' 'curl')
 
+mongoose_pkgver="7.8"
+
 _srcprefix="local:/"
 _libfiles=(
   "CMakeLists.txt" "main.cpp"
@@ -63,10 +65,10 @@ source=(${source[@]} "$_srcprefix/resources/CascadiaMono.woff")
 sha512sums=(${sha512sums[@]} "180d3248b16d5d3ed3aca598eb67e7edb8ec8553c21edafe96d9d268989c0d7896a615c7e67527d1fca913308e1b24a363a59c7826b7e341012e853736db4fa6")
 
 
-external=(${external[@]} "https://raw.githubusercontent.com/cesanta/mongoose/0a265e79a67d7bfcdca27f2ccb98ccb474677ec6/mongoose.c")
+external=(${external[@]} "https://raw.githubusercontent.com/cesanta/mongoose/$mongoose_pkgver/mongoose.c")
 sha512sums=(${sha512sums[@]} "2fb2abd382aecc86ae4a9474fa8c40fe3f59e32cba20259d4588815f67d9658cbbe5f87a1b3eb18c5a8defe38becce5e38f1e08b35da2335a3e441e2346666e7")
 
-external=(${external[@]} "https://raw.githubusercontent.com/cesanta/mongoose/0a265e79a67d7bfcdca27f2ccb98ccb474677ec6/mongoose.h")
+external=(${external[@]} "https://raw.githubusercontent.com/cesanta/mongoose/$mongoose_pkgver/mongoose.h")
 sha512sums=(${sha512sums[@]} "931f723081512935f5bcb8737dd280408cfcb161d9ebff72657654bc6006c3b2d283eae1c9d2f1ce8db5318fa17d7434280827ef7e3935401825b5359917f9fb")
 
 external=(${external[@]} "https://raw.githubusercontent.com/imperzer0/strscan/2f263154679e67ed44aa7fc4ae65829547e8290b/strscan.c")

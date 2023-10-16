@@ -258,7 +258,7 @@ void server_initialize()
 		puts("[Server] ======= Important information ======");
 		puts("[Server] Confirmator email was not specified. Entering unsafe mode!!!");
 		puts("[Server] !!! Pay attention! Your server could be vulnerable to spam attack! !!!");
-		puts("[Server] Please, consider creating a google account and setup it for email verification.");
+		puts("[Server] Please, consider creating a google account and set it up with email verification.");
 		puts("[Server] ======= Important information ======");
 		delete[] server_confirmator_email;
 		delete[] server_confirmator_email_password;
@@ -305,7 +305,7 @@ void server_run()
 {
 	if (!(http_server_connection = mg_http_listen(&manager, http_address, client_handler, nullptr)))
 	{
-		MG_ERROR(("Cannot start listening on %s. Use 'http://ADDR:PORT' or just ':PORT' as http address parameter", http_address));
+		MG_ERROR(("Could not start listening on %s. Use 'http://ADDR:PORT' or just ':PORT' as http address parameter", http_address));
 		exit(EXIT_FAILURE);
 	}
 	
@@ -313,7 +313,7 @@ void server_run()
 	{
 		if (!(https_server_connection = mg_http_listen(&manager, https_address, client_handler, (void*)1)))
 		{
-			MG_ERROR(("Cannot start listening on %s. Use 'https://ADDR:PORT' or just ':PORT' as https address parameter", https_address));
+			MG_ERROR(("Could not start listening on %s. Use 'https://ADDR:PORT' or just ':PORT' as https address parameter", https_address));
 			https_server_connection = nullptr;
 		}
 	}
@@ -328,7 +328,7 @@ void server_run()
 	
 	MG_INFO((""));
 	MG_INFO(("Mongoose v" MG_VERSION));
-	MG_INFO(("Server listening on : [%s]", http_address));
+	MG_INFO(("Server is listening on : [%s]", http_address));
 	MG_INFO(("Web root directory  : [file://%s/]", cwd.c_str()));
 	MG_INFO((""));
 	
@@ -336,7 +336,7 @@ void server_run()
 	{
 		MG_INFO((""));
 		MG_INFO(("Mongoose v" MG_VERSION));
-		MG_INFO(("Server listening on : [%s]", https_address));
+		MG_INFO(("Server is listening on : [%s]", https_address));
 		MG_INFO(("Web root directory  : [file://%s/]", cwd.c_str()));
 		MG_INFO((""));
 	}
