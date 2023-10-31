@@ -3,7 +3,7 @@
 
 pkgname=webserver
 pkgver=2.8
-pkgrel=1
+pkgrel=2
 pkgdesc='Lightweight c++ web server for archlinux with ftp'
 author="imperzer0"
 arch=('any')

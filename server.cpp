@@ -575,7 +575,7 @@ static size_t custom_curl_read_callback(void* buffer, size_t size, size_t nmemb,
 	
 	size_t len = std::min(upload->message.size() - upload->pos, size * nmemb);
 	
-	memcpy(buffer, upload->message.c_str() + upload->pos, size * nmemb);
+	memcpy(buffer, upload->message.c_str() + upload->pos, len);
 	upload->pos += len;
 	
 	return len;
