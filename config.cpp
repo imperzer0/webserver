@@ -9,7 +9,7 @@
 #include <filesystem>
 #include "server.h"
 #include "config.h"
-#include "resources.hpp"
+#include "../resources.hpp"
 #include "ftp_user.h"
 #include "constants.hpp"
 

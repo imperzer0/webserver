@@ -9,7 +9,7 @@
 #include "mongoose.c"
 #include "constants.hpp"
 #include "strscan.c"
-#include "resources.hpp"
+#include "../resources.hpp"
 #include "config.h"
 #include <fineftp/server.h>
 #include <map>
@@ -29,7 +29,7 @@ int log_level = 2, hexdump = 0;
 
 pthread_mutex_t ftp_callback_mutex = PTHREAD_MUTEX_INITIALIZER;
 
-static struct mg_mgr manager{ };
+static struct mg_mgr manager { };
 static struct mg_connection* http_server_connection = nullptr, * https_server_connection = nullptr;
 static fineftp::FtpServer ftp_server;
 static std::map<std::string, std::pair<std::string, std::string>> ftp_users;
@@ -135,7 +135,6 @@ inline void handle_confirm_html(struct mg_connection* connection, struct mg_http
 inline void handle_resources_html(struct mg_connection* connection, struct mg_http_message* msg);
 
 
-
 /// Add path handler to global linked list
 void register_path_handler(
 		const std::string& path, const std::string& description, path_handler_function fn,
@@ -145,16 +144,16 @@ void register_path_handler(
 	MG_INFO(("Registering '%s' => '%s' path...", description.c_str(), path.c_str()));
 	if (!handlers_head)
 	{
-		handlers = new registered_path_handlers{
-				.data = new registered_path_handler{ .path = path, .description = description, .fn = fn, .restriction_type = type },
-				.next = nullptr };
+		handlers = new registered_path_handlers {
+				.data = new registered_path_handler {.path = path, .description = description, .fn = fn, .restriction_type = type},
+				.next = nullptr};
 		handlers_head = handlers;
 	}
 	else
 	{
-		handlers_head->next = new registered_path_handlers{
-				.data = new registered_path_handler{ .path = path, .description = description, .fn = fn, .restriction_type = type },
-				.next = nullptr };
+		handlers_head->next = new registered_path_handlers {
+				.data = new registered_path_handler {.path = path, .description = description, .fn = fn, .restriction_type = type},
+				.next = nullptr};
 		handlers_head = handlers_head->next;
 	}
 }
@@ -164,7 +163,7 @@ inline void handle_registered_paths(struct mg_connection* connection, struct mg_
 {
 	MG_INFO(("Handling non-builtin registered paths..."));
 	registered_path_handlers* root = handlers;
-	
+
 	while (root && root->data)
 	{
 		switch (root->data->restriction_type)
@@ -180,20 +179,18 @@ inline void handle_registered_paths(struct mg_connection* connection, struct mg_
 		}
 		root = root->next;
 	}
-	
+
 	exit_loop:
-	
+
 	if (root && root->data)
 	{
-		char addr[20];
-		mg_ntoa(&connection->rem, addr, sizeof addr);
-		MG_INFO(("Handling '%s' => '%s' path for IP %s...", root->data->description.c_str(), root->data->path.c_str(), addr));
+		MG_INFO(("Handling '%s' => '%s' path for IP %M...", root->data->description.c_str(), root->data->path.c_str(),
+				mg_print_ip, &connection->rem));
 		return root->data->fn(connection, msg);
 	}
-	
+
 	send_error_html(connection, 404, "rgba(147, 0, 0, 0.90)");
 }
-
 
 
 inline void handle_http_message(struct mg_connection* connection, struct mg_http_message* msg)
@@ -216,7 +213,6 @@ inline void handle_http_message(struct mg_connection* connection, struct mg_http
 }
 
 
-
 /// Handle mongoose events
 void client_handler(struct mg_connection* connection, int ev, void* ev_data, void* fn_data)
 {
@@ -224,16 +220,16 @@ void client_handler(struct mg_connection* connection, int ev, void* ev_data, voi
 	{
 		std::string stls_path(tls_path);
 		if (!stls_path.ends_with('/')) stls_path += '/';
-		
+
 		std::string cert_path(stls_path);
 		cert_path += "cert.pem";
-		
+
 		std::string key_path(stls_path);
 		key_path += "key.pem";
-		
+
 		struct mg_tls_opts opts = {
 				.cert = cert_path.c_str(),   // Certificate PEM file
-				.certkey = key_path.c_str(), // This pem contains both cert and key
+				.key = key_path.c_str(), // This pem contains both cert and key
 		};
 		mg_tls_init(connection, &opts);
 	}
@@ -252,7 +248,7 @@ void server_initialize()
 		puts("[Server] Error occurred in server initialization: Confirmator email's password was not specified.");
 		exit(-3);
 	}
-	
+
 	if (server_confirmator_email == nullptr || *server_confirmator_email == 0)
 	{
 		puts("[Server] ======= Important information ======");
@@ -264,36 +260,35 @@ void server_initialize()
 		delete[] server_confirmator_email_password;
 		server_confirmator_email = server_confirmator_email_password = nullptr;
 	}
-	
+
 	// Initialize the libcurl library
 	curl_global_init(CURL_GLOBAL_ALL);
-	
+
 	signal(SIGINT, signal_handler);
 	signal(SIGTERM, signal_handler);
 	signal(SIGQUIT, signal_handler);
-	
+
 	mg_log_set(log_level);
 	mg_mgr_init(&manager);
-	
+
 	if (log_level >= 2)
 	{
 		add_custom_ftp_handler(
 				[](
 						const std::string& ftp_command, const std::string& parameters, const std::string& ftp_working_directory,
 						std::shared_ptr<::fineftp::FtpUser> ftp_user
-				)
-				{
+				) {
 					mutex_locker l(&ftp_callback_mutex);
 					MG_INFO((" [FTP] %s %s", ftp_command.c_str(), parameters.c_str()));
 				}
 		);
 	}
-	
+
 	register_additional_handlers();
-	
+
 	MG_INFO(("[FTP] Adding anonymous user to ftp server..."));
 	ftp_server.addUserAnonymous(getcwd(), fineftp::Permission::ReadOnly);
-	
+
 	MG_INFO(("[FTP] Loading users from file..."));
 	load_users();
 	MG_INFO(("[FTP] Forwarding users to ftp server..."));
@@ -305,33 +300,35 @@ void server_run()
 {
 	if (!(http_server_connection = mg_http_listen(&manager, http_address, client_handler, nullptr)))
 	{
-		MG_ERROR(("Could not start listening on %s. Use 'http://ADDR:PORT' or just ':PORT' as http address parameter", http_address));
+		MG_ERROR(
+				("Could not start listening on %s. Use 'http://ADDR:PORT' or just ':PORT' as http address parameter", http_address));
 		exit(EXIT_FAILURE);
 	}
-	
+
 	if (tls_path)
 	{
 		if (!(https_server_connection = mg_http_listen(&manager, https_address, client_handler, (void*)1)))
 		{
-			MG_ERROR(("Could not start listening on %s. Use 'https://ADDR:PORT' or just ':PORT' as https address parameter", https_address));
+			MG_ERROR(
+					("Could not start listening on %s. Use 'https://ADDR:PORT' or just ':PORT' as https address parameter", https_address));
 			https_server_connection = nullptr;
 		}
 	}
-	
+
 	if (hexdump)
 		http_server_connection->is_hexdumping = 1;
-	
+
 	if (hexdump && https_server_connection)
 		https_server_connection->is_hexdumping = 1;
-	
+
 	auto cwd = getcwd();
-	
+
 	MG_INFO((""));
 	MG_INFO(("Mongoose v" MG_VERSION));
 	MG_INFO(("Server is listening on : [%s]", http_address));
 	MG_INFO(("Web root directory  : [file://%s/]", cwd.c_str()));
 	MG_INFO((""));
-	
+
 	if (https_server_connection)
 	{
 		MG_INFO((""));
@@ -340,29 +337,26 @@ void server_run()
 		MG_INFO(("Web root directory  : [file://%s/]", cwd.c_str()));
 		MG_INFO((""));
 	}
-	
+
 	ftp_server.start(4);
 	MG_INFO(("[FTP]"));
 	MG_INFO(("[FTP] Started ftp server on : [ftp://%s:%d]", ftp_server.getAddress().c_str(), ftp_server.getPort()));
 	MG_INFO(("[FTP] Web root directory    : [file://%s/]", cwd.c_str()));
 	MG_INFO(("[FTP]"));
-	
+
 	while (s_signo == 0) mg_mgr_poll(&manager, 1000);
-	
+
 	mg_mgr_free(&manager);
 	ftp_server.stop();
 	MG_INFO(("Exiting due to signal [%d]...", s_signo));
-	
+
 	exit(s_signo);
 }
 
 
-
 inline void handle_index_html(struct mg_connection* connection, struct mg_http_message* msg)
 {
-	char addr[20];
-	mg_ntoa(&connection->rem, addr, sizeof addr);
-	MG_INFO(("Serving index.html to %s...", addr));
+	MG_INFO(("Serving index.html to %M...", mg_print_ip, &connection->rem));
 	size_t accumulate = 0, count = 0;
 	std::string appendix;
 	for (auto* i = handlers; i != nullptr && i->data != nullptr;
@@ -371,10 +365,10 @@ inline void handle_index_html(struct mg_connection* connection, struct mg_http_m
 		appendix += "<li><a href=\"" + i->data->path + "\">" + i->data->description + "</a></li>\n";
 		MG_INFO(("Indexed '%s' => '%s'.", i->data->description.c_str(), i->data->path.c_str()));
 	}
-	
+
 	char article_complete[LEN(article_html) + count * 20 + accumulate + 1];
 	sprintf(article_complete, RESOURCE(article_html), appendix.c_str());
-	
+
 	mg_http_reply(
 			connection, 200, "Content-Type: text/html\r\n",
 			RESOURCE(index_html), article_complete
@@ -384,9 +378,7 @@ inline void handle_index_html(struct mg_connection* connection, struct mg_http_m
 
 inline void handle_favicon_html(struct mg_connection* connection, struct mg_http_message* msg)
 {
-	char addr[20];
-	mg_ntoa(&connection->rem, addr, sizeof addr);
-	MG_INFO(("Serving favicon.ico to %s...", addr));
+	MG_INFO(("Serving favicon.ico to %M...", mg_print_ip, &connection->rem));
 	http_send_resource(connection, msg, RESOURCE(favicon_ico), LEN(favicon_ico), "image/x-icon");
 }
 
@@ -417,12 +409,12 @@ static void list_dir(struct mg_connection* c, struct mg_http_message* hm, const 
 			"}"
 			"</script>";
 	struct mg_fs* fs = opts->fs == nullptr ? &mg_fs_posix : opts->fs;
-	struct printdirentrydata d = { c, hm, opts, dir };
+	struct printdirentrydata d = {c, hm, opts, dir};
 	char tmp[10], buf[MG_PATH_MAX];
 	size_t off, n;
 	int len = mg_url_decode(hm->uri.ptr, hm->uri.len, buf, sizeof(buf), 0);
 	struct mg_str uri = len > 0 ? mg_str_n(buf, (size_t)len) : hm->uri;
-	
+
 	mg_printf(
 			c,
 			"HTTP/1.1 200 OK\r\n"
@@ -454,7 +446,7 @@ static void list_dir(struct mg_connection* c, struct mg_http_message* hm, const 
 			"  <tr><td><a href=\"..\">..</a></td>"
 			"<td name=-1></td><td name=-1>[DIR]</td></tr>\n"
 	);
-	
+
 	fs->ls(dir, printdirentry, &d);
 	mg_printf(c, "</tbody><tfoot><tr><td colspan=\"3\"><hr></td></tr></tfoot> </table></body></html>\n");
 	n = mg_snprintf(tmp, sizeof(tmp), "%lu", (unsigned long)(c->send.len - off));
@@ -470,13 +462,13 @@ void serve_dir(struct mg_connection* c, struct mg_http_message* hm, const struct
 	int flags = uri_to_path(c, hm, opts, path, sizeof(path));
 	if (flags < 0)
 		return; // Do nothing: the response has already been sent by uri_to_path()
-	
+
 	if (flags & MG_FS_DIR)
 	{
 		list_dir(c, hm, opts, path);
 		return;
 	}
-	
+
 	if (flags && sp != nullptr && mg_globmatch(sp, strlen(sp), path, strlen(path)))
 		mg_http_serve_ssi(c, opts->root_dir, path);
 	else
@@ -485,48 +477,46 @@ void serve_dir(struct mg_connection* c, struct mg_http_message* hm, const struct
 
 inline void handle_dir_html(struct mg_connection* connection, struct mg_http_message* msg)
 {
-	char addr[20];
-	mg_ntoa(&connection->rem, addr, sizeof addr);
-	MG_INFO(("Serving /dir/ to %s...", addr));
+	MG_INFO(("Serving /dir/ to %M...", mg_print_ip, &connection->rem));
 	char* path = nullptr;
 	auto cwd = getcwd();
-	
+
 	std::string uri(msg->uri.ptr, msg->uri.len);
 	strscanf(uri.c_str(), "/dir/%s", &path);
-	
+
 	std::string spath(secure_path(path ? path : ""));
 	delete[] path;
-	
+
 	if (!spath.starts_with('/')) spath = "/" + spath;
-	
+
 	std::string sdpath(spath);
 	sdpath.reserve(sdpath.size() + 1);
 	mg_url_decode(sdpath.c_str(), sdpath.size(), sdpath.data(), sdpath.size() + 1, 0);
 	sdpath = sdpath.data();
-	
-	struct stat st{ };
+
+	struct stat st { };
 	if (::stat((cwd + sdpath).c_str(), &st) != 0)
 	{
 		send_error_html(connection, 404, "rgba(147, 0, 0, 0.90)");
 		return;
 	}
-	
-	struct mg_http_serve_opts opts{ .root_dir = cwd.c_str() };
+
+	struct mg_http_serve_opts opts {.root_dir = cwd.c_str()};
 	std::string extra_header;
-	
+
 	if (st.st_size > MAX_INLINE_FILE_SIZE)
 	{
 		extra_header = "Content-Disposition: attachment; filename=\"";
 		extra_header += path_basename(sdpath.c_str());
 		extra_header += "\"\r\n";
-		
+
 		opts.extra_headers = extra_header.c_str();
 	}
-	
+
 	std::string msgstrcp(msg->message.ptr, msg->uri.ptr);
 	msgstrcp += spath;
-	
-	struct mg_http_message msg2{ };
+
+	struct mg_http_message msg2 { };
 	msg2.message = mg_str_n(msgstrcp.data(), msgstrcp.size());
 	msg2.uri = mg_str_n(msg2.message.ptr + (msg->uri.ptr - msg->message.ptr), spath.size());
 	msg2.method = msg->method;
@@ -534,28 +524,23 @@ inline void handle_dir_html(struct mg_connection* connection, struct mg_http_mes
 	msg2.proto = msg->proto;
 	msg2.body = msg->body;
 	msg2.head = msg->head;
-	msg2.chunk = msg->chunk;
 	for (size_t i = 0; i < MG_MAX_HTTP_HEADERS; ++i)
 		msg2.headers[i] = msg->headers[i];
-	
+
 	serve_dir(connection, &msg2, &opts);
 }
 
 
 inline void handle_register_form_html(struct mg_connection* connection, struct mg_http_message* msg)
 {
-	char addr[20];
-	mg_ntoa(&connection->rem, addr, sizeof addr);
-	MG_INFO(("Serving /register-form to %s...", addr));
+	MG_INFO(("Serving /register-form to %M...", mg_print_ip, &connection->rem));
 	mg_http_reply(connection, 200, "Content-Type: text/html\r\n", RESOURCE(register_html));
 }
 
 
 inline void send_confirmation_notification_page_html(struct mg_connection* connection)
 {
-	char addr[20];
-	mg_ntoa(&connection->rem, addr, sizeof addr);
-	MG_INFO(("Sending email confirmation page to %s...", addr));
+	MG_INFO(("Sending email confirmation page to %M...", mg_print_ip, &connection->rem));
 	mg_http_reply(connection, 200, "Content-Type: text/html\r\n", RESOURCE(confirm_html));
 }
 
@@ -569,134 +554,132 @@ typedef struct
 static size_t custom_curl_read_callback(void* buffer, size_t size, size_t nmemb, void* instream)
 {
 	auto* upload = (MessageData*)instream;
-	
+
 	if ((size == 0) || (nmemb == 0) || ((size * nmemb) < 1) || upload->pos >= upload->message.size())
 		return 0;
-	
+
 	size_t len = std::min(upload->message.size() - upload->pos, size * nmemb);
-	
+
 	memcpy(buffer, upload->message.c_str() + upload->pos, len);
 	upload->pos += len;
-	
+
 	return len;
 }
 
 inline id_t generate_id_and_send_email(struct mg_connection* connection, struct mg_http_message* msg, const std::string& email)
 {
 	auto server_address = mg_http_get_header(msg, "Host");
-	
+
 	if (server_address == nullptr)
 		return 0;
-	
+
 	std::string server_address_str(server_address->ptr, server_address->len);
-	
+
 	srandom(mg_millis());
-	
+
 	id_t id = random();
 	for (int i = 0; id == 0 || ftp_users_pending.contains(id) && i < 10; ++i) id = random();
 	if (ftp_users_pending.contains(id))
 		return 0;
-	
+
 	// Set up the curl handle
 	CURL* curl = curl_easy_init();
-	
+
 	if (!curl)
 	{
 		MG_ERROR(("[Send Email] Unable to initialize curl."));
 		return 0;
 	}
-	
+
 	// Set the SMTP server and port
 	curl_easy_setopt(curl, CURLOPT_URL, server_confirmator_smtp_server);
-	
+
 	// Set the username and password for authentication
 	curl_easy_setopt(curl, CURLOPT_USERNAME, server_confirmator_email);
 	curl_easy_setopt(curl, CURLOPT_PASSWORD, server_confirmator_email_password);
-	
+
 	std::string link = "http" + std::string(connection->is_tls ? "s" : "") +
 	                   "://" + server_address_str + "/confirm/" + std::to_string(id);
-	
+
 	// Define email message
 	std::string message = "To: " + email + "\r\n" +
 	                      "From: " + server_confirmator_email + "\r\n" +
 	                      "Subject: Confirm registration of new account\r\n"
 	                      "\r\n"
 	                      "To complete registration open link " + link + " in any available browser.";
-	
+
 	MG_INFO(("Sending link [%s] to [%s]", link.c_str(), email.c_str()));
-	
+
 	struct curl_slist* recipients = nullptr;
 	curl_easy_setopt(curl, CURLOPT_MAIL_FROM, server_confirmator_email);
 	recipients = curl_slist_append(recipients, email.c_str());
 	curl_easy_setopt(curl, CURLOPT_MAIL_RCPT, recipients);
-	
+
 	curl_easy_setopt(curl, CURLOPT_READFUNCTION, custom_curl_read_callback);
-	MessageData data{ .message = message, .pos = 0 };
+	MessageData data {.message = message, .pos = 0};
 	curl_easy_setopt(curl, CURLOPT_READDATA, &data);
 	curl_easy_setopt(curl, CURLOPT_UPLOAD, 1L);
 	curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
-	
+
 	// Send the email
 	CURLcode res = curl_easy_perform(curl);
-	
+
 	// Check for errors
 	if (res != CURLE_OK)
 		MG_ERROR(("[Send Email] curl_easy_perform() failed: %s\n", curl_easy_strerror(res)));
-	
+
 	// Clean up
 	curl_slist_free_all(recipients);
 	curl_easy_cleanup(curl);
 	curl_global_cleanup();
-	
+
 	return id;
 }
 
 inline void handle_register_html(struct mg_connection* connection, struct mg_http_message* msg)
 {
-	char addr[20];
-	mg_ntoa(&connection->rem, addr, sizeof addr);
-	MG_INFO(("Processing registration request from %s...", addr));
+	MG_INFO(("Processing registration request from %M...", mg_print_ip, &connection->rem));
 	if (mg_strcmp(msg->method, mg_str("POST"))) return;
-	
-	char login[HOST_NAME_MAX]{ }, email[HOST_NAME_MAX]{ }, password[HOST_NAME_MAX]{ };
+
+	char login[HOST_NAME_MAX] { }, email[HOST_NAME_MAX] { }, password[HOST_NAME_MAX] { };
 	mg_http_get_var(&msg->body, "login", login, sizeof(login));
 	mg_http_get_var(&msg->body, "email", email, sizeof(email));
 	mg_http_get_var(&msg->body, "password", password, sizeof(password));
-	
+
 	if (login[0] == 0)
 	{
 		mg_http_reply(connection, 400, "", "Login is required");
 		return;
 	}
-	
+
 	if (email[0] == 0)
 	{
 		mg_http_reply(connection, 400, "", "Email is required");
 		return;
 	}
-	
+
 	if (password[0] == 0 || strlen(password) < 8)
 	{
 		mg_http_reply(connection, 400, "", "Password is required and must be at least 8 characters long");
 		return;
 	}
-	
+
 	if (ftp_users.contains(login))
 	{
 		mg_http_reply(connection, 400, "", "User already exists");
 		MG_INFO(("Blocked attempt to create existing user - '%s'.", login));
 		return;
 	}
-	
+
 	if (server_confirmator_email == nullptr)
 	{
-		auto user = ftp_users.insert({ login, { email, password } });
+		auto user = ftp_users.insert({login, {email, password}});
 		if (!user.second)
 		{
 			mg_http_reply(connection, 400, "", "Cant insert user");
 			return;
 		}
-		
+
 		save_users();
 		add_user(*user.first);
 		mg_http_reply(connection, 200, "", "Success");
@@ -709,8 +692,8 @@ inline void handle_register_html(struct mg_connection* connection, struct mg_htt
 			mg_http_reply(connection, 500, "", "Can't register new user");
 			return;
 		}
-		
-		ftp_users_pending[id] = { login, { email, password } };
+
+		ftp_users_pending[id] = {login, {email, password}};
 		send_confirmation_notification_page_html(connection);
 	}
 }
@@ -723,20 +706,18 @@ inline void handle_confirm_html(struct mg_connection* connection, struct mg_http
 		send_error_html(connection, 404, "rgba(147, 0, 0, 0.90)");
 		return;
 	}
-	
-	char addr[20];
-	mg_ntoa(&connection->rem, addr, sizeof addr);
-	MG_INFO(("Processing confirmation request from %s...", addr));
+
+	MG_INFO(("Processing confirmation request from %M...", mg_print_ip, &connection->rem));
 	if (mg_strcmp(msg->method, mg_str("GET"))) return;
-	
+
 	char* id_ptr = nullptr;
-	
+
 	std::string uri(msg->uri.ptr, msg->uri.len);
 	strscanf(uri.c_str(), "/confirm/%s", &id_ptr);
-	
+
 	std::string id_str(secure_path(id_ptr ? id_ptr : ""));
 	delete[] id_ptr;
-	
+
 	id_t id = 0;
 	try
 	{
@@ -747,27 +728,27 @@ inline void handle_confirm_html(struct mg_connection* connection, struct mg_http
 		mg_http_reply(connection, 400, "", "Invalid link");
 		return;
 	}
-	
+
 	if (id == 0)
 	{
 		mg_http_reply(connection, 400, "", "Invalid link");
 		return;
 	}
-	
+
 	auto pending_user = ftp_users_pending.find(id);
 	if (pending_user == ftp_users_pending.end())
 	{
 		mg_http_reply(connection, 400, "", "Invalid link");
 		return;
 	}
-	
+
 	auto user = ftp_users.insert(pending_user->second);
 	if (!user.second)
 	{
 		mg_http_reply(connection, 400, "", "Cant insert user");
 		return;
 	}
-	
+
 	save_users();
 	add_user(*user.first);
 	mg_http_reply(connection, 200, "", "Success");
@@ -776,30 +757,28 @@ inline void handle_confirm_html(struct mg_connection* connection, struct mg_http
 
 inline void handle_resources_html(struct mg_connection* connection, struct mg_http_message* msg)
 {
-	char addr[20];
-	mg_ntoa(&connection->rem, addr, sizeof addr);
-	MG_INFO(("Processing /resources/ for %s...", addr));
-	
+	MG_INFO(("Processing /resources/ for %M...", mg_print_ip, &connection->rem));
+
 	char* path = nullptr;
-	
+
 	std::string uri(msg->uri.ptr, msg->uri.len);
 	strscanf(uri.c_str(), "/resources/%s", &path);
-	
+
 	std::string path_s(path);
 	delete[] path;
-	
+
 	if (path_s == "bootstrap.css")
 	{
 		http_send_resource(connection, msg, RESOURCE(bootstrap_css), LEN(bootstrap_css), "text/css");
 		return;
 	}
-	
+
 	if (path_s == "CascadiaMono.woff")
 	{
 		http_send_resource(connection, msg, RESOURCE(CascadiaMono_woff), LEN(CascadiaMono_woff), "font/woff");
 		return;
 	}
-	
+
 	send_error_html(connection, 404, "rgba(147, 0, 0, 0.90)");
 }
 
@@ -813,7 +792,7 @@ int unlink_cb(const char* fpath, const struct stat*, int, struct FTW*)
 
 inline bool rm_rf(const char* path)
 {
-	struct stat st{ };
+	struct stat st { };
 	if (stat(path, &st) < 0)
 		return true;
 	return nftw(path, unlink_cb, 64, FTW_DEPTH | FTW_PHYS) == 0;
@@ -822,18 +801,18 @@ inline bool rm_rf(const char* path)
 
 inline bool mkdir_p(const char* path)
 {
-	struct stat st{ };
+	struct stat st { };
 	if (stat(path, &st) == 0)
 	{
 		if (S_ISDIR(st.st_mode))
 			return true;
 		rm_rf(path);
 	}
-	
-	char tmp[256]{ };
+
+	char tmp[256] { };
 	char* p = nullptr;
 	size_t len;
-	
+
 	snprintf(tmp, sizeof(tmp), "%s", path);
 	len = strlen(tmp);
 	if (tmp[len - 1] == '/')
@@ -856,11 +835,11 @@ inline static void load_users()
 	{
 		while (!::feof(file))
 		{
-			char username[HOST_NAME_MAX + 1]{ };
-			char email[HOST_NAME_MAX + 1]{ };
-			char password[HOST_NAME_MAX + 1]{ };
+			char username[HOST_NAME_MAX + 1] { };
+			char email[HOST_NAME_MAX + 1] { };
+			char password[HOST_NAME_MAX + 1] { };
 			if (::fscanf(file, "%s : %s : %s\n", username, email, password) == 3) // Scan line in format "<user> : <password>\n"
-				ftp_users[username] = { email, password }; // Store username and password
+				ftp_users[username] = {email, password}; // Store username and password
 		}
 		::fclose(file);
 	}
@@ -885,7 +864,7 @@ inline static void forward_all_users()
 {
 	std::string cwd(getcwd());
 	cwd += '/';
-	
+
 	for (const auto& ftp_user : ftp_users)
 	{
 		std::string root_dir = cwd + ftp_user.first;
@@ -910,7 +889,6 @@ inline static void add_user(decltype(*ftp_users.begin())& ftp_user)
 }
 
 
-
 inline static consteval size_t static_strlen(const char* str)
 {
 	size_t len = 0;
@@ -928,7 +906,7 @@ inline bool starts_with(const char* str, const char* prefix)
 
 inline std::string getcwd()
 {
-	char cwd[PATH_MAX]{ };
+	char cwd[PATH_MAX] { };
 	getcwd(cwd, PATH_MAX);
 	cwd[PATH_MAX - 1] = 0;
 	std::string cwdstr(cwd);
@@ -985,14 +963,14 @@ inline void http_send_resource(
 )
 {
 	int n, status = 200;
-	char range[100]{ };
-	int64_t r1 = 0, r2 = 0, cl = (int64_t)rcsize;
+	char range[100] { };
+	size_t r1 = 0, r2 = 0, cl = rcsize;
 	struct mg_str mime = mg_str_s(mime_type);
-	
+
 	// Handle Range header
 	struct mg_str* rh = mg_http_get_header(msg, "Range");
 	range[0] = '\0';
-	if (rh != nullptr && (n = getrange(rh, &r1, &r2)) > 0 && r1 >= 0 && r2 >= 0)
+	if (rh != nullptr && (n = getrange(rh, &r1, &r2)) > 0)
 	{
 		// If range is specified like "400-", set second limit to content len
 		if (n == 1) r2 = cl - 1;
@@ -1000,13 +978,13 @@ inline void http_send_resource(
 		{
 			status = 416;
 			cl = 0;
-			mg_snprintf(range, sizeof(range), "Content-Range: bytes */%lld\r\n", (int64_t)rcsize);
+			mg_snprintf(range, sizeof(range), "Content-Range: bytes */%llu\r\n", rcsize);
 		}
 		else
 		{
 			status = 206;
 			cl = r2 - r1 + 1;
-			mg_snprintf(range, sizeof(range), "Content-Range: bytes %lld-%lld/%lld\r\n", r1, r1 + cl - 1, (int64_t)rcsize);
+			mg_snprintf(range, sizeof(range), "Content-Range: bytes %llu%llu/%llu\r\n", r1, r1 + cl - 1, rcsize);
 		}
 	}
 	mg_printf(
@@ -1020,37 +998,38 @@ inline void http_send_resource(
 			cl,
 			range
 	);
-	
+
 	if (mg_vcasecmp(&msg->method, "HEAD") == 0)
 	{
 		connection->is_draining = 1;
 		connection->is_resp = 0;
 		return;
 	}
-	
-	
+
+
 	typedef struct
 	{
 		const char* data;
 		uint64_t len;
 		uint64_t pos;
 	} str_buf_fd;
-	
-	connection->pfn = [](struct mg_connection* c, int ev, void* ev_data, void* fn_data)
-	{
+
+	connection->pfn = [](struct mg_connection* c, int ev, void* ev_data, void* fn_data) {
 		if (ev == MG_EV_WRITE || ev == MG_EV_POLL)
 		{
 			auto rc = (str_buf_fd*)fn_data;
-			
+
 			// Read to send IO buffer directly, avoid extra on-stack buffer
-			size_t max = MG_IO_SIZE, space, * cl = (size_t*)c->label;
+			size_t max = MG_IO_SIZE, space;
+			size_t* cl = (size_t*)&c->data[(sizeof(c->data) - sizeof(size_t)) /
+			                               sizeof(size_t) * sizeof(size_t)];
 			if (c->send.size < max)
 				mg_iobuf_resize(&c->send, max);
 			if (c->send.len >= c->send.size)
 				return;  // Rate limit
 			if ((space = c->send.size - c->send.len) > *cl)
 				space = *cl;
-			
+
 			memcpy(c->send.buf + c->send.len, &rc->data[rc->pos], space);
 			rc->pos += space;
 			c->send.len += space;
@@ -1071,8 +1050,11 @@ inline void http_send_resource(
 			c->is_resp = 0;
 		}
 	};
-	connection->pfn_data = new str_buf_fd{ .data = rcdata, .len = rcsize, .pos = 0 };
-	*(size_t*)connection->label = (size_t)cl;  // Track to-be-sent content length
+	// Track to-be-sent content length at the end of connection->data, aligned
+	size_t *clp = (size_t *) &connection->data[(sizeof(connection->data) - sizeof(size_t)) /
+	                                  sizeof(size_t) * sizeof(size_t)];
+	connection->pfn_data = new str_buf_fd {.data = rcdata, .len = rcsize, .pos = 0};
+	*clp = (size_t)cl;  // Track to-be-sent content length
 }
 
 

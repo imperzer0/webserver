@@ -74,7 +74,7 @@ function(create_resources output)
     file(APPEND ${output} "\n#endif //WEBSERVER_RESOURCES_HPP")
 endfunction()
 
-create_resources("resources.hpp")
+create_resources("../resources.hpp")
 
 
 message(" [ compiler ]  ${CMAKE_CXX_COMPILER}_${CMAKE_CXX_STANDARD} ${CMAKE_CXX_FLAGS}")

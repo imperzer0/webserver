@@ -3,7 +3,7 @@
 
 pkgname=webserver
 pkgver=2.8
-pkgrel=2
+pkgrel=3
 pkgdesc='Lightweight c++ web server for archlinux with ftp'
 author="imperzer0"
 arch=('any')
@@ -12,7 +12,7 @@ license=('GPL3')
 depends=('openssl' 'gcc' 'curl')
 makedepends=('cmake' 'git' 'gcc' 'make' 'openssl' 'curl')
 
-mongoose_pkgver="7.8"
+mongoose_pkgver="7.12"
 
 _srcprefix="local:/"
 _libfiles=(
@@ -66,10 +66,10 @@ sha512sums=(${sha512sums[@]} "180d3248b16d5d3ed3aca598eb67e7edb8ec8553c21edafe96
 
 
 external=(${external[@]} "https://raw.githubusercontent.com/cesanta/mongoose/$mongoose_pkgver/mongoose.c")
-sha512sums=(${sha512sums[@]} "2fb2abd382aecc86ae4a9474fa8c40fe3f59e32cba20259d4588815f67d9658cbbe5f87a1b3eb18c5a8defe38becce5e38f1e08b35da2335a3e441e2346666e7")
+sha512sums=(${sha512sums[@]} "55011c1328abcfa91897b4b29aa5e1ab6c5f5f351442b8fc247ee9d9751dbbce1ab1892f9f996f140a18719a49412f45aad6c6bdbf7eed3348cb01982293daea")
 
 external=(${external[@]} "https://raw.githubusercontent.com/cesanta/mongoose/$mongoose_pkgver/mongoose.h")
-sha512sums=(${sha512sums[@]} "931f723081512935f5bcb8737dd280408cfcb161d9ebff72657654bc6006c3b2d283eae1c9d2f1ce8db5318fa17d7434280827ef7e3935401825b5359917f9fb")
+sha512sums=(${sha512sums[@]} "d13e87f326c285ce3aa7e837edb826d38f8bb73c72ac572af44f42447e9456f820f6d42e2248a33c18a3813b51f9e76ecfc99bba077d99a8f61d3b0b99b5cecd")
 
 external=(${external[@]} "https://raw.githubusercontent.com/imperzer0/strscan/2f263154679e67ed44aa7fc4ae65829547e8290b/strscan.c")
 sha512sums=(${sha512sums[@]} "0f62f4fb922325e53713d7013b709d65d50a2c94a440258b666d357bf35af2f5727b2014fbf955e15f169acc8e444eca84b309419886bbc98d0b563c4b795bc6")
