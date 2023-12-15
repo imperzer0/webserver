@@ -6,9 +6,9 @@
 
 
 #include "server.h"
-#include "mongoose.c"
+#include "../mongoose.c"
 #include "constants.hpp"
-#include "strscan.c"
+#include "../strscan.c"
 #include "../resources.hpp"
 #include "config.h"
 #include <fineftp/server.h>

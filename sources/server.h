@@ -9,8 +9,8 @@
 #define WEBSERVER_SERVER_H
 
 #include <string>
-#include "mongoose.h"
-#include "ftp_event_handler.h"
+#include "../mongoose.h"
+#include "../ftp/ftp_event_handler.h"
 
 
 extern const char* http_address;

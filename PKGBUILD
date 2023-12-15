@@ -14,21 +14,24 @@ makedepends=('cmake' 'git' 'gcc' 'make' 'openssl' 'curl')
 
 mongoose_pkgver="7.12"
 
-_srcprefix="local:/"
+_srcprefix="file://$(pwd)"
 _libfiles=(
-  "CMakeLists.txt" "main.cpp"
-  "server.cpp" "server.h" "constants.hpp"
-  "config.cpp" "config.h"
+  "main.cpp"
+  "server.cpp"
+  "server.h"
+  "constants.hpp"
+  "config.cpp"
+  "config.h"
 )
 
 _rcfiles=(
-  "resources/error.html"
-  "resources/index.html"
-  "resources/article.html"
-  "resources/register.html"
-  "resources/confirm.html"
-  "resources/dashboard.html"
-  "resources/bootstrap.css"
+  "error.html"
+  "index.html"
+  "article.html"
+  "register.html"
+  "confirm.html"
+  "dashboard.html"
+  "bootstrap.css"
 )
 
 _ftpfiles=(
@@ -40,28 +43,33 @@ _ftpfiles=(
   "ftp_session.cpp.patch"
 )
 
+source=(${source[@]} "$_srcprefix/CMakeLists.txt")
+sha512sums=(${sha512sums[@]} "SKIP")
+
 # shellcheck disable=SC2068
 for _libfile in ${_libfiles[@]}; do
-  source=(${source[@]} "$_srcprefix/$_libfile")
+  source=(${source[@]} "$_srcprefix/sources/$_libfile")
   sha512sums=(${sha512sums[@]} "SKIP")
 done
 
 # shellcheck disable=SC2068
 for _rcfile in ${_rcfiles[@]}; do
-  source=(${source[@]} "$_srcprefix/$_rcfile")
+  source=(${source[@]} "$_srcprefix/resources/$_rcfile")
   sha512sums=(${sha512sums[@]} "SKIP")
 done
 
 # shellcheck disable=SC2068
 for _ftpfile in ${_ftpfiles[@]}; do
-  source=(${source[@]} "$_srcprefix/$_ftpfile")
+  source=(${source[@]} "$_srcprefix/ftp/$_ftpfile")
   sha512sums=(${sha512sums[@]} "SKIP")
 done
 
 source=(${source[@]} "$_srcprefix/resources/favicon.ico")
+_rcfiles=(${_rcfiles[@]} "favicon.ico")
 sha512sums=(${sha512sums[@]} "72850225ffda45dff7f87645e80512ddce302fec175df7adb0e6d8d91f5f5a2131250fe91510b35f19cf05c1d229aa9eb8f71594c918555acb0418f3c2975cff")
 
 source=(${source[@]} "$_srcprefix/resources/CascadiaMono.woff")
+_rcfiles=(${_rcfiles[@]} "CascadiaMono.woff")
 sha512sums=(${sha512sums[@]} "180d3248b16d5d3ed3aca598eb67e7edb8ec8553c21edafe96d9d268989c0d7896a615c7e67527d1fca913308e1b24a363a59c7826b7e341012e853736db4fa6")
 
 
@@ -82,6 +90,25 @@ source=(${source[@]} ${external[@]})
 _package_version=" ("$pkgver"-"$pkgrel")"
 
 prepare() {
+  mkdir sources
+  # shellcheck disable=SC2068
+  for _libfile in ${_libfiles[@]}; do
+    mv "$_libfile" "sources/$_libfile"
+  done
+
+  mkdir resources
+  # shellcheck disable=SC2068
+  for _rcfile in ${_rcfiles[@]}; do
+    mv "$_rcfile" "resources/$_rcfile"
+  done
+
+  mkdir ftp
+  # shellcheck disable=SC2068
+  for _ftpfile in ${_ftpfiles[@]}; do
+    mv "$_ftpfile" "ftp/$_ftpfile"
+  done
+
+  cd ftp
   makepkg -sif --noconfirm -p PKGBUILD.fineftp
 }
 
