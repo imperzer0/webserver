@@ -2,7 +2,7 @@
 // Author: Perets Dmytro <imperator999mcpe@gmail.com>
 //
 // Personal usage is allowed only if this comment was not changed or deleted.
-// Commercial usage must be agreed with the author of this comment.
+// Commercial usage must be approved by the author of this comment.
 
 
 #ifndef WEBSERVER_CONFIG_H

@@ -2,7 +2,7 @@
 // Author: Perets Dmytro <imperator999mcpe@gmail.com>
 //
 // Personal usage is allowed only if this comment was not changed or deleted.
-// Commercial usage must be agreed with the author of this comment.
+// Commercial usage must be approved by the author of this comment.
 
 
 #include "server.h"
@@ -254,6 +254,7 @@ void server_initialize()
 	mg_log_set(log_level);
 	mg_mgr_init(&manager);
 
+#ifdef ENABLE_FILESYSTEM_ACCESS
 	if (log_level >= 2)
 	{
 		add_custom_ftp_handler(
@@ -266,6 +267,7 @@ void server_initialize()
 				}
 		);
 	}
+#endif
 
 #ifdef ENABLE_FILESYSTEM_ACCESS
 		register_additional_handlers();

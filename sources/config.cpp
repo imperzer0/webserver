@@ -2,7 +2,7 @@
 // Author: Perets Dmytro <imperator999mcpe@gmail.com>
 //
 // Personal usage is allowed only if this comment was not changed or deleted.
-// Commercial usage must be agreed with the author of this comment.
+// Commercial usage must be approved by the author of this comment.
 
 
 #include <list>
@@ -14,6 +14,7 @@
 #include "tools.h"
 
 
+#ifdef ENABLE_FILESYSTEM_ACCESS
 typedef struct
 {
 	unsigned long long recent_uploads_count;
@@ -44,6 +45,7 @@ void execute_next_time(
 				new scheduled_handler { .handler = handler, .ftp_command = ftp_command, .parameters = parameters,
 						.ftp_working_directory = ftp_working_directory, .ftp_user = ftp_user };
 }
+#endif
 
 
 /// Register user-defined path ftp_handlers
