@@ -20,6 +20,8 @@ _libfiles=(
   "server.cpp"
   "server.h"
   "constants.hpp"
+  "tools.h"
+  "tools.cpp"
   "config.cpp"
   "config.h"
 )

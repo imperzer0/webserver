@@ -33,7 +33,7 @@ set(resource_files
         "resources/dashboard.html"
         "resources/bootstrap.css"
         "resources/CascadiaMono.woff"
-        )
+)
 
 # Creates C resources file from files in given directory
 function(create_resources output)
@@ -84,6 +84,7 @@ set(CMAKE_VERBOSE_MAKEFILE on)
 add_executable(webserver
         sources/main.cpp
         sources/server.cpp
-        sources/config.cpp)
+        sources/config.cpp
+        sources/tools.cpp)
 
 target_link_libraries(webserver pthread ssl crypto fineftp-server curl)

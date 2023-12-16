@@ -43,14 +43,4 @@ extern void register_path_handler(
 		decltype(registered_path_handler::restriction_type) type
 );
 
-class mutex_locker
-{
-private:
-	pthread_mutex_t* mutex;
-public:
-	explicit mutex_locker(pthread_mutex_t* mutex);
-	
-	~mutex_locker();
-};
-
 #endif //WEBSERVER_SERVER_H

@@ -8,6 +8,12 @@
 #ifndef WEBSERVER_CONFIG_H
 #define WEBSERVER_CONFIG_H
 
+/* Uncomment this macro to enable ftp server */
+//#define ENABLE_FILESYSTEM_ACCESS
+
+
+#ifdef ENABLE_FILESYSTEM_ACCESS
 extern void register_additional_handlers();
+#endif
 
 #endif //WEBSERVER_CONFIG_H
