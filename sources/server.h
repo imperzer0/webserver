@@ -9,6 +9,7 @@
 #define WEBSERVER_SERVER_H
 
 #include <string>
+#include <map>
 #include "../mongoose.h"
 
 #ifdef ENABLE_FILESYSTEM_ACCESS
@@ -47,5 +48,7 @@ extern void register_path_handler(
 		const std::string& path, const std::string& description, path_handler_function fn,
 		decltype(registered_path_handler::restriction_type) type
 );
+
+extern const auto* get_registered_users();
 
 #endif //WEBSERVER_SERVER_H

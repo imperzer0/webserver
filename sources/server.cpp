@@ -122,6 +122,11 @@ inline void handle_confirm_html(struct mg_connection* connection, struct mg_http
 inline void handle_resources_html(struct mg_connection* connection, struct mg_http_message* msg);
 
 
+extern const auto* get_registered_users()
+{
+	return &registered_users;
+}
+
 /// Add path handler to global linked list
 void register_path_handler(
 		const std::string& path, const std::string& description, path_handler_function fn,
