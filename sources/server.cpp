@@ -33,7 +33,9 @@ const char* server_confirmator_email_password = nullptr;
 const char* server_confirmator_smtp_server = "smtps://smtp.gmail.com:465";
 int log_level = 2, hexdump = 0;
 
+#ifdef ENABLE_FILESYSTEM_ACCESS
 pthread_mutex_t ftp_callback_mutex = PTHREAD_MUTEX_INITIALIZER;
+#endif
 
 static struct mg_mgr manager { };
 static struct mg_connection* http_server_connection = nullptr, * https_server_connection = nullptr;
@@ -100,10 +102,12 @@ inline void send_error_html(struct mg_connection* connection, int code, const ch
 inline void handle_index_html(struct mg_connection* connection, struct mg_http_message* msg);
 
 /// Handle favicon access
-inline void handle_favicon_html(struct mg_connection* connection, struct mg_http_message* msg);
+inline void handle_favicon_ico(struct mg_connection* connection, struct mg_http_message* msg);
 
+#ifdef ENABLE_FILESYSTEM_ACCESS
 /// Handle filesystem access (serve directory)
 inline void handle_dir_html(struct mg_connection* connection, struct mg_http_message* msg);
+#endif
 
 /// Handle user registration form access
 inline void handle_register_form_html(struct mg_connection* connection, struct mg_http_message* msg);
@@ -181,9 +185,11 @@ inline void handle_http_message(struct mg_connection* connection, struct mg_http
 	if (mg_http_match_uri(msg, "/") || mg_http_match_uri(msg, "/index.html") || mg_http_match_uri(msg, "/index"))
 		handle_index_html(connection, msg);
 	else if (mg_http_match_uri(msg, "/favicon.ico") || mg_http_match_uri(msg, "/favicon"))
-		handle_favicon_html(connection, msg);
-	else if (starts_with(msg->uri.ptr, "/dir/"))
-		handle_dir_html(connection, msg);
+		handle_favicon_ico(connection, msg);
+#ifdef ENABLE_FILESYSTEM_ACCESS
+		else if (starts_with(msg->uri.ptr, "/dir/"))
+			handle_dir_html(connection, msg);
+#endif
 	else if (mg_http_match_uri(msg, "/register-form"))
 		handle_register_form_html(connection, msg);
 	else if (mg_http_match_uri(msg, "/register"))
@@ -270,10 +276,10 @@ void server_initialize()
 #endif
 
 #ifdef ENABLE_FILESYSTEM_ACCESS
-		register_additional_handlers();
+	register_additional_handlers();
 
-		MG_INFO(("[FTP] Adding anonymous user to ftp server..."));
-		ftp_server.addUserAnonymous(getcwd(), fineftp::Permission::ReadOnly);
+	MG_INFO(("[FTP] Adding anonymous user to ftp server..."));
+	ftp_server.addUserAnonymous(getcwd(), fineftp::Permission::ReadOnly);
 #endif
 
 	MG_INFO(("[USERS] Loading users from file..."));
@@ -351,17 +357,19 @@ void server_run()
 inline void handle_index_html(struct mg_connection* connection, struct mg_http_message* msg)
 {
 	MG_INFO(("Serving index.html to %M...", mg_print_ip, &connection->rem));
-	size_t accumulate = 0, count = 0;
-	std::string appendix;
-	for (auto* i = handlers; i != nullptr && i->data != nullptr;
-	     accumulate += i->data->path.size() + i->data->description.size(), ++count, i = i->next)
+	std::string list_html;
+#ifdef ENABLE_FILESYSTEM_ACCESS
+	list_html += "<li><a href=\"/dir/\">Observe directory structure</a></li>\n";
+#endif
+	list_html += "<li><a href=\"/register-form\">Create a new account</a></li>\n";
+	for (auto* i = handlers; i != nullptr && i->data != nullptr; i = i->next)
 	{
-		appendix += "<li><a href=\"" + i->data->path + "\">" + i->data->description + "</a></li>\n";
+		list_html += "<li><a href=\"" + i->data->path + "\">" + i->data->description + "</a></li>\n";
 		MG_INFO(("Indexed '%s' => '%s'.", i->data->description.c_str(), i->data->path.c_str()));
 	}
 
-	char article_complete[LEN(article_html) + count * 20 + accumulate + 1];
-	sprintf(article_complete, RESOURCE(article_html), appendix.c_str());
+	char article_complete[LEN(article_html) + list_html.size() + 1];
+	sprintf(article_complete, RESOURCE(article_html), list_html.c_str());
 
 	mg_http_reply(
 			connection, 200, "Content-Type: text/html\r\n",
@@ -370,7 +378,7 @@ inline void handle_index_html(struct mg_connection* connection, struct mg_http_m
 }
 
 
-inline void handle_favicon_html(struct mg_connection* connection, struct mg_http_message* msg)
+inline void handle_favicon_ico(struct mg_connection* connection, struct mg_http_message* msg)
 {
 	MG_INFO(("Serving favicon.ico to %M...", mg_print_ip, &connection->rem));
 	http_send_resource(connection, msg, RESOURCE(favicon_ico), LEN(favicon_ico), "image/x-icon");
@@ -469,6 +477,7 @@ void serve_dir(struct mg_connection* c, struct mg_http_message* hm, const struct
 		mg_http_serve_file(c, hm, path, opts);
 }
 
+#ifdef ENABLE_FILESYSTEM_ACCESS
 inline void handle_dir_html(struct mg_connection* connection, struct mg_http_message* msg)
 {
 	MG_INFO(("Serving /dir/ to %M...", mg_print_ip, &connection->rem));
@@ -523,6 +532,7 @@ inline void handle_dir_html(struct mg_connection* connection, struct mg_http_mes
 
 	serve_dir(connection, &msg2, &opts);
 }
+#endif
 
 
 inline void handle_register_form_html(struct mg_connection* connection, struct mg_http_message* msg)
@@ -766,18 +776,11 @@ inline void handle_resources_html(struct mg_connection* connection, struct mg_ht
 	delete[] path;
 
 	if (path_s == "bootstrap.css")
-	{
 		http_send_resource(connection, msg, RESOURCE(bootstrap_css), LEN(bootstrap_css), "text/css");
-		return;
-	}
-
-	if (path_s == "CascadiaMono.woff")
-	{
+	else if (path_s == "CascadiaMono.woff")
 		http_send_resource(connection, msg, RESOURCE(CascadiaMono_woff), LEN(CascadiaMono_woff), "font/woff");
-		return;
-	}
-
-	send_error_html(connection, 404, "rgba(147, 0, 0, 0.90)");
+	else
+		send_error_html(connection, 404, "rgba(147, 0, 0, 0.90)");
 }
 
 

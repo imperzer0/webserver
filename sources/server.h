@@ -24,7 +24,9 @@ extern const char* server_confirmator_email_password;
 extern const char* server_confirmator_smtp_server;
 extern int log_level, hexdump;
 
+#ifdef ENABLE_FILESYSTEM_ACCESS
 extern pthread_mutex_t ftp_callback_mutex;
+#endif
 
 extern void server_initialize();
 
