@@ -17,10 +17,10 @@ void add_custom_ftp_handler(ftp_event_handler_function handler)
 {
 	auto* it = ftp_handlers;
 	for (; it->handler != nullptr && it->next != nullptr; it = it->next);
-	
+
 	if (it->handler != nullptr)
 	{
-		it->next = new event_handler{ .next = nullptr, .handler = handler };
+		it->next = new event_handler { .next = nullptr, .handler = handler };
 	}
 	else
 	{

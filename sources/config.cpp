@@ -11,6 +11,7 @@
 #include "config.h"
 #include "../resources.hpp"
 #include "constants.hpp"
+#include "tools.h"
 
 
 typedef struct
@@ -19,7 +20,7 @@ typedef struct
 	std::list<std::pair<std::string, std::string>> recent_uploaded_files;
 } dashboard_data;
 
-static dashboard_data statistics = { .recent_uploads_count = 0, .recent_uploaded_files = { } };
+static dashboard_data statistics = { .recent_uploads_count = 0, .recent_uploaded_files = { }};
 
 
 typedef struct
@@ -40,27 +41,8 @@ void execute_next_time(
 {
 	if (scheduled_action_command == nullptr)
 		scheduled_action_command =
-				new scheduled_handler{ .handler = handler, .ftp_command = ftp_command, .parameters = parameters,
+				new scheduled_handler { .handler = handler, .ftp_command = ftp_command, .parameters = parameters,
 						.ftp_working_directory = ftp_working_directory, .ftp_user = ftp_user };
-}
-
-
-inline std::string path_basename(std::string path)
-{
-	if (path.empty()) return "";
-	while (path.ends_with('/')) path.pop_back();
-	size_t slash = path.find_last_of('/');
-	if (slash == std::string::npos) return "";
-	return std::move(path.substr(slash + 1));
-}
-
-inline std::string getcwd()
-{
-	char cwd[PATH_MAX]{ };
-	getcwd(cwd, PATH_MAX);
-	cwd[PATH_MAX - 1] = 0;
-	std::string cwdstr(cwd);
-	return std::move(cwdstr);
 }
 
 
@@ -83,65 +65,65 @@ void register_additional_handlers()
 	//
 	// 		}
 	// );
-	
+
+
+#ifdef ENABLE_FILESYSTEM_ACCESS
 	register_path_handler(
 			"/dashboard", "View statistics on dashboard",
-			[](struct mg_connection* connection, struct mg_http_message* msg)
-			{
+			[](struct mg_connection* connection, struct mg_http_message* msg) {
 				std::string appendix;
 				for (auto& f : statistics.recent_uploaded_files)
 				{
 					appendix += "<li><a href=\"/dir/" + f.second + "\">" + f.first + "</a></li>\n";
 					MG_INFO(("Indexed '%s' => '%s'.", f.first.c_str(), f.second.c_str()));
 				}
-				
+
 				mg_http_reply(
 						connection, 200, "", RESOURCE(dashboard_html),
 						statistics.recent_uploads_count, appendix.c_str()
 				);
 			}, registered_path_handler::STRICT
 	);
-	
+
 	add_custom_ftp_handler(
 			[](
 					const std::string& ftp_command, const std::string& parameters, const std::string& ftp_working_directory,
 					std::shared_ptr<::fineftp::FtpUser> ftp_user
-			)
-			{
+			) {
 				if (scheduled_action_command != nullptr)
 				{
 					scheduled_action_command->handler(
 							scheduled_action_command->ftp_command, scheduled_action_command->parameters,
 							scheduled_action_command->ftp_working_directory, scheduled_action_command->ftp_user
 					);
-					
+
 					delete scheduled_action_command;
 					scheduled_action_command = nullptr;
 				}
-				
+
 				if (ftp_command == "STOR")
 				{
 					execute_next_time(
 							[](
-									const std::string& ftp_command, const std::string& parameters, const std::string& ftp_working_directory,
+									const std::string& ftp_command, const std::string& parameters,
+									const std::string& ftp_working_directory,
 									std::shared_ptr<::fineftp::FtpUser> ftp_user
-							)
-							{
+							) {
 								std::string filepath;
 								if (!parameters.empty() && (parameters[0] == '/'))
 									filepath = parameters;
 								else
 									filepath = ftp_working_directory + "/" + parameters;
-								
+
 								std::string local_root_path = ftp_user->local_root_path_;
 								while (local_root_path.ends_with('/')) local_root_path.pop_back();
 								filepath = local_root_path + "/" + filepath;
-								
-								struct stat st{ };
+
+								struct stat st { };
 								if (::stat(filepath.c_str(), &st) == 0 && S_ISREG(st.st_mode))
 								{
 									++statistics.recent_uploads_count;
-									
+
 									filepath.erase(filepath.size() - 5); // remove .part additional extension
 									std::filesystem::path base(getcwd());
 									std::filesystem::path fpath(filepath);
@@ -156,4 +138,5 @@ void register_additional_handlers()
 				}
 			}
 	);
+#endif
 }

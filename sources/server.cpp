@@ -128,15 +128,15 @@ void register_path_handler(
 	if (!handlers_head)
 	{
 		handlers = new registered_path_handlers {
-				.data = new registered_path_handler {.path = path, .description = description, .fn = fn, .restriction_type = type},
-				.next = nullptr};
+				.data = new registered_path_handler { .path = path, .description = description, .fn = fn, .restriction_type = type },
+				.next = nullptr };
 		handlers_head = handlers;
 	}
 	else
 	{
 		handlers_head->next = new registered_path_handlers {
-				.data = new registered_path_handler {.path = path, .description = description, .fn = fn, .restriction_type = type},
-				.next = nullptr};
+				.data = new registered_path_handler { .path = path, .description = description, .fn = fn, .restriction_type = type },
+				.next = nullptr };
 		handlers_head = handlers_head->next;
 	}
 }
@@ -401,7 +401,7 @@ static void list_dir(struct mg_connection* c, struct mg_http_message* hm, const 
 			"}"
 			"</script>";
 	struct mg_fs* fs = opts->fs == nullptr ? &mg_fs_posix : opts->fs;
-	struct printdirentrydata d = {c, hm, opts, dir};
+	struct printdirentrydata d = { c, hm, opts, dir };
 	char tmp[10], buf[MG_PATH_MAX];
 	size_t off, n;
 	int len = mg_url_decode(hm->uri.ptr, hm->uri.len, buf, sizeof(buf), 0);
@@ -493,7 +493,7 @@ inline void handle_dir_html(struct mg_connection* connection, struct mg_http_mes
 		return;
 	}
 
-	struct mg_http_serve_opts opts {.root_dir = cwd.c_str()};
+	struct mg_http_serve_opts opts { .root_dir = cwd.c_str() };
 	std::string extra_header;
 
 	if (st.st_size > MAX_INLINE_FILE_SIZE)
@@ -608,7 +608,7 @@ inline id_t generate_id_and_send_email(struct mg_connection* connection, struct 
 	curl_easy_setopt(curl, CURLOPT_MAIL_RCPT, recipients);
 
 	curl_easy_setopt(curl, CURLOPT_READFUNCTION, custom_curl_read_callback);
-	MessageData data {.message = message, .pos = 0};
+	MessageData data { .message = message, .pos = 0 };
 	curl_easy_setopt(curl, CURLOPT_READDATA, &data);
 	curl_easy_setopt(curl, CURLOPT_UPLOAD, 1L);
 	curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
@@ -665,7 +665,7 @@ inline void handle_register_html(struct mg_connection* connection, struct mg_htt
 
 	if (server_confirmator_email == nullptr)
 	{
-		auto user = registered_users.insert({login, {email, password}});
+		auto user = registered_users.insert({ login, { email, password }});
 		if (!user.second)
 		{
 			mg_http_reply(connection, 400, "", "Cant insert user");
@@ -687,7 +687,7 @@ inline void handle_register_html(struct mg_connection* connection, struct mg_htt
 			return;
 		}
 
-		registered_users_pending[id] = {login, {email, password}};
+		registered_users_pending[id] = { login, { email, password }};
 		send_confirmation_notification_page_html(connection);
 	}
 }
@@ -835,7 +835,7 @@ inline static void load_users()
 			char email[HOST_NAME_MAX + 1] { };
 			char password[HOST_NAME_MAX + 1] { };
 			if (::fscanf(file, "%s : %s : %s\n", username, email, password) == 3) // Scan line in format "<user> : <password>\n"
-				registered_users[username] = {email, password}; // Store username and password
+				registered_users[username] = { email, password }; // Store username and password
 		}
 		::fclose(file);
 	}
@@ -982,7 +982,7 @@ inline void http_send_resource(
 	// Track to-be-sent content length at the end of connection->data, aligned
 	size_t* clp = (size_t*)&connection->data[(sizeof(connection->data) - sizeof(size_t)) /
 	                                         sizeof(size_t) * sizeof(size_t)];
-	connection->pfn_data = new str_buf_fd {.data = rcdata, .len = rcsize, .pos = 0};
+	connection->pfn_data = new str_buf_fd { .data = rcdata, .len = rcsize, .pos = 0 };
 	*clp = (size_t)cl;  // Track to-be-sent content length
 }
 

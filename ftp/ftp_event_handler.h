@@ -23,7 +23,6 @@ typedef struct event_handler
 {
 	struct event_handler* next = nullptr;
 	ftp_event_handler_function handler = nullptr;
-	
 } event_handler;
 
 extern event_handler* ftp_handlers;
