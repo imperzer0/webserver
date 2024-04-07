@@ -28,9 +28,9 @@ typedef id_t uint32_t;
 const char* http_address = DEFAULT_HTTP_SERVER_ADDRESS;
 const char* https_address = DEFAULT_HTTPS_SERVER_ADDRESS;
 const char* tls_path = nullptr;
-const char* server_confirmator_email = nullptr;
-const char* server_confirmator_email_password = nullptr;
-const char* server_confirmator_smtp_server = "smtps://smtp.gmail.com:465";
+const char* server_confirm_email = nullptr;
+const char* server_confirm_email_password = nullptr;
+const char* server_confirm_smtp_server = "smtps://smtp.gmail.com:465";
 int log_level = 2, hexdump = 0;
 
 #ifdef ENABLE_FILESYSTEM_ACCESS
@@ -95,7 +95,7 @@ inline void http_send_resource(
 );
 
 /// Send error page over http
-inline void send_error_html(struct mg_connection* connection, int code, const char* color);
+inline void send_error_html(struct mg_connection* connection, int code, const char* color, const char* msg);
 
 
 /// Handle index page access
@@ -181,7 +181,7 @@ inline void handle_registered_paths(struct mg_connection* connection, struct mg_
 		return root->data->fn(connection, msg);
 	}
 
-	send_error_html(connection, 404, "rgba(147, 0, 0, 0.90)");
+	send_error_html(connection, COLORED_ERROR(404), "");
 }
 
 
@@ -192,8 +192,8 @@ inline void handle_http_message(struct mg_connection* connection, struct mg_http
 	else if (mg_http_match_uri(msg, "/favicon.ico") || mg_http_match_uri(msg, "/favicon"))
 		handle_favicon_ico(connection, msg);
 #ifdef ENABLE_FILESYSTEM_ACCESS
-		else if (starts_with(msg->uri.ptr, "/dir/"))
-			handle_dir_html(connection, msg);
+	else if (starts_with(msg->uri.ptr, "/dir/"))
+		handle_dir_html(connection, msg);
 #endif
 	else if (mg_http_match_uri(msg, "/register-form"))
 		handle_register_form_html(connection, msg);
@@ -237,22 +237,22 @@ void client_handler(struct mg_connection* connection, int ev, void* ev_data, voi
 /// Initialize server
 void server_initialize()
 {
-	if (server_confirmator_email != nullptr && server_confirmator_email_password == nullptr)
+	if (server_confirm_email != nullptr && server_confirm_email_password == nullptr)
 	{
 		puts("[Server] Error occurred in server initialization: Confirmator email's password was not specified.");
 		exit(-3);
 	}
 
-	if (server_confirmator_email == nullptr || *server_confirmator_email == 0)
+	if (server_confirm_email == nullptr || *server_confirm_email == 0)
 	{
 		puts("[Server] ======= Important information ======");
 		puts("[Server] Confirmator email was not specified. Entering unsafe mode!!!");
 		puts("[Server] !!! Pay attention! Your server could be vulnerable to spam attack! !!!");
 		puts("[Server] Please, consider creating a google account and set it up with email verification.");
 		puts("[Server] ======= Important information ======");
-		delete[] server_confirmator_email;
-		delete[] server_confirmator_email_password;
-		server_confirmator_email = server_confirmator_email_password = nullptr;
+		delete[] server_confirm_email;
+		delete[] server_confirm_email_password;
+		server_confirm_email = server_confirm_email_password = nullptr;
 	}
 
 	// Initialize the libcurl library
@@ -505,7 +505,7 @@ inline void handle_dir_html(struct mg_connection* connection, struct mg_http_mes
 	struct stat st { };
 	if (::stat((cwd + sdpath).c_str(), &st) != 0)
 	{
-		send_error_html(connection, 404, "rgba(147, 0, 0, 0.90)");
+		send_error_html(connection, COLORED_ERROR(404), "");
 		return;
 	}
 
@@ -560,7 +560,7 @@ typedef struct
 } MessageData;
 
 // Callback function that provides the data for the email message
-static size_t custom_curl_read_callback(void* buffer, size_t size, size_t nmemb, void* instream)
+static size_t curl_read_callback_email_data(void* buffer, size_t size, size_t nmemb, void* instream)
 {
 	auto* upload = (MessageData*)instream;
 
@@ -577,10 +577,31 @@ static size_t custom_curl_read_callback(void* buffer, size_t size, size_t nmemb,
 
 inline id_t generate_id_and_send_email(struct mg_connection* connection, struct mg_http_message* msg, const std::string& email)
 {
+	auto email_hostaddr_pos = email.find('@');
+	if (email_hostaddr_pos == std::string::npos)
+		return 0;
+
+	if (!server_confirm_email_hosts_whitelist.empty() &&
+	    !server_confirm_email_hosts_whitelist.contains(email.substr(email_hostaddr_pos + 1)))
+	{
+		send_error_html(connection, COLORED_ERROR(406), "This email service provider is not allowed");
+		return 0;
+	}
+
+	if (!server_confirm_email_hosts_blacklist.empty() &&
+	    server_confirm_email_hosts_blacklist.contains(email.substr(email_hostaddr_pos + 1)))
+	{
+		send_error_html(connection, COLORED_ERROR(406), "This email service provider is not allowed");
+		return 0;
+	}
+
 	auto server_address = mg_http_get_header(msg, "Host");
 
 	if (server_address == nullptr)
+	{
+		send_error_html(connection, COLORED_ERROR(500), "Can't generate a confirmation link");
 		return 0;
+	}
 
 	std::string server_address_str(server_address->ptr, server_address->len);
 
@@ -597,22 +618,23 @@ inline id_t generate_id_and_send_email(struct mg_connection* connection, struct 
 	if (!curl)
 	{
 		MG_ERROR(("[Send Email] Unable to initialize curl."));
+		send_error_html(connection, COLORED_ERROR(500), "Can't generate a confirmation link");
 		return 0;
 	}
 
 	// Set the SMTP server and port
-	curl_easy_setopt(curl, CURLOPT_URL, server_confirmator_smtp_server);
+	curl_easy_setopt(curl, CURLOPT_URL, server_confirm_smtp_server);
 
 	// Set the username and password for authentication
-	curl_easy_setopt(curl, CURLOPT_USERNAME, server_confirmator_email);
-	curl_easy_setopt(curl, CURLOPT_PASSWORD, server_confirmator_email_password);
+	curl_easy_setopt(curl, CURLOPT_USERNAME, server_confirm_email);
+	curl_easy_setopt(curl, CURLOPT_PASSWORD, server_confirm_email_password);
 
 	std::string link = "http" + std::string(connection->is_tls ? "s" : "") +
 	                   "://" + server_address_str + "/confirm/" + std::to_string(id);
 
 	// Define email message
 	std::string message = "To: " + email + "\r\n" +
-	                      "From: " + server_confirmator_email + "\r\n" +
+	                      "From: " + server_confirm_email + "\r\n" +
 	                      "Subject: Confirm registration of new account\r\n"
 	                      "\r\n"
 	                      "To complete registration open link " + link + " in any available browser.";
@@ -620,11 +642,11 @@ inline id_t generate_id_and_send_email(struct mg_connection* connection, struct 
 	MG_INFO(("Sending link [%s] to [%s]", link.c_str(), email.c_str()));
 
 	struct curl_slist* recipients = nullptr;
-	curl_easy_setopt(curl, CURLOPT_MAIL_FROM, server_confirmator_email);
+	curl_easy_setopt(curl, CURLOPT_MAIL_FROM, server_confirm_email);
 	recipients = curl_slist_append(recipients, email.c_str());
 	curl_easy_setopt(curl, CURLOPT_MAIL_RCPT, recipients);
 
-	curl_easy_setopt(curl, CURLOPT_READFUNCTION, custom_curl_read_callback);
+	curl_easy_setopt(curl, CURLOPT_READFUNCTION, curl_read_callback_email_data);
 	MessageData data { .message = message, .pos = 0 };
 	curl_easy_setopt(curl, CURLOPT_READDATA, &data);
 	curl_easy_setopt(curl, CURLOPT_UPLOAD, 1L);
@@ -657,35 +679,35 @@ inline void handle_register_html(struct mg_connection* connection, struct mg_htt
 
 	if (login[0] == 0)
 	{
-		mg_http_reply(connection, 400, "", "Login is required");
+		send_error_html(connection, COLORED_ERROR(406), "Login is required");
 		return;
 	}
 
 	if (email[0] == 0)
 	{
-		mg_http_reply(connection, 400, "", "Email is required");
+		send_error_html(connection, COLORED_ERROR(406), "Email is required");
 		return;
 	}
 
 	if (password[0] == 0 || strlen(password) < 8)
 	{
-		mg_http_reply(connection, 400, "", "Password is required and must be at least 8 characters long");
+		send_error_html(connection, COLORED_ERROR(406), "Password is required and must be at least 8 characters long");
 		return;
 	}
 
 	if (registered_users.contains(login))
 	{
-		mg_http_reply(connection, 400, "", "User already exists");
+		send_error_html(connection, COLORED_ERROR(409), "User already exists");
 		MG_INFO(("Blocked attempt to create existing user - '%s'.", login));
 		return;
 	}
 
-	if (server_confirmator_email == nullptr)
+	if (server_confirm_email == nullptr)
 	{
 		auto user = registered_users.insert({ login, { email, password }});
 		if (!user.second)
 		{
-			mg_http_reply(connection, 400, "", "Cant insert user");
+			send_error_html(connection, COLORED_ERROR(500), "Could not insert user");
 			return;
 		}
 
@@ -698,11 +720,7 @@ inline void handle_register_html(struct mg_connection* connection, struct mg_htt
 	else
 	{
 		id_t id = generate_id_and_send_email(connection, msg, email);
-		if (id == 0)
-		{
-			mg_http_reply(connection, 500, "", "Can't register new user");
-			return;
-		}
+		if (id == 0) return;
 
 		registered_users_pending[id] = { login, { email, password }};
 		send_confirmation_notification_page_html(connection);
@@ -712,9 +730,9 @@ inline void handle_register_html(struct mg_connection* connection, struct mg_htt
 
 inline void handle_confirm_html(struct mg_connection* connection, struct mg_http_message* msg)
 {
-	if (server_confirmator_email == nullptr)
+	if (server_confirm_email == nullptr)
 	{
-		send_error_html(connection, 404, "rgba(147, 0, 0, 0.90)");
+		send_error_html(connection, COLORED_ERROR(405), "Email authorization in disabled");
 		return;
 	}
 
@@ -736,27 +754,27 @@ inline void handle_confirm_html(struct mg_connection* connection, struct mg_http
 	}
 	catch (...)
 	{
-		mg_http_reply(connection, 400, "", "Invalid link");
+		send_error_html(connection, COLORED_ERROR(403), "Invalid link");
 		return;
 	}
 
 	if (id == 0)
 	{
-		mg_http_reply(connection, 400, "", "Invalid link");
+		send_error_html(connection, COLORED_ERROR(403), "Invalid link");
 		return;
 	}
 
 	auto pending_user = registered_users_pending.find(id);
 	if (pending_user == registered_users_pending.end())
 	{
-		mg_http_reply(connection, 400, "", "Invalid link");
+		send_error_html(connection, COLORED_ERROR(403), "Invalid link");
 		return;
 	}
 
 	auto user = registered_users.insert(pending_user->second);
 	if (!user.second)
 	{
-		mg_http_reply(connection, 400, "", "Cant insert user");
+		send_error_html(connection, COLORED_ERROR(500), "Could not insert user");
 		return;
 	}
 
@@ -785,7 +803,7 @@ inline void handle_resources_html(struct mg_connection* connection, struct mg_ht
 	else if (path_s == "CascadiaMono.woff")
 		http_send_resource(connection, msg, RESOURCE(CascadiaMono_woff), LEN(CascadiaMono_woff), "font/woff");
 	else
-		send_error_html(connection, 404, "rgba(147, 0, 0, 0.90)");
+		send_error_html(connection, COLORED_ERROR(404), "This resource does not exist");
 }
 
 
@@ -997,10 +1015,10 @@ inline void http_send_resource(
 }
 
 
-inline void send_error_html(struct mg_connection* connection, int code, const char* color)
+inline void send_error_html(struct mg_connection* connection, int code, const char* color, const char* msg)
 {
 	mg_http_reply(
 			connection, code, "Content-Type: text/html\r\n", RESOURCE(error_html),
-			color, color, color, color, code, mg_http_status_code_str(code)
+			color, color, color, color, code, mg_http_status_code_str(code), msg
 	);
 }

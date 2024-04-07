@@ -13,6 +13,11 @@
 #include "constants.hpp"
 #include "tools.h"
 
+#ifdef ENABLE_FILESYSTEM_ACCESS
+#include "../ftp/ftp_user.h"
+#include "../ftp/ftp_event_handler.h"
+#endif
+
 
 #ifdef ENABLE_FILESYSTEM_ACCESS
 typedef struct
@@ -51,7 +56,7 @@ void execute_next_time(
 /// Register user-defined path ftp_handlers
 void register_additional_handlers()
 {
-	// TODO: Create your handlers here
+	// TODO: You can create your own handlers over here
 	// Template :
 	// register_path_handler(
 	// 		"PATH", "DESCRIPTION",
@@ -142,3 +147,17 @@ void register_additional_handlers()
 	);
 #endif
 }
+
+
+///
+/// TODO: You can add email hostnames to one of this lists to filter out undesired email hosts
+/// Note: If you leave the list empty it will not take any effect
+///
+
+std::set<std::string> server_confirm_email_hosts_whitelist {
+		// Add hostnames here as comma separated list of strings: "str1", "str2", "str3" ... "strn"
+};
+
+std::set<std::string> server_confirm_email_hosts_blacklist {
+		// Add hostnames here as comma separated list of strings: "str1", "str2", "str3" ... "strn"
+};
