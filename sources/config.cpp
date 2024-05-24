@@ -154,10 +154,10 @@ void register_additional_handlers()
 /// Note: If you leave the list empty it will not take any effect
 ///
 
-std::set<std::string> server_confirm_email_hosts_whitelist {
+std::set<std::string> server_verification_email_hosts_whitelist {
 		// Add hostnames here as comma separated list of strings: "str1", "str2", "str3" ... "strn"
 };
 
-std::set<std::string> server_confirm_email_hosts_blacklist {
+std::set<std::string> server_verification_email_hosts_blacklist {
 		// Add hostnames here as comma separated list of strings: "str1", "str2", "str3" ... "strn"
 };
