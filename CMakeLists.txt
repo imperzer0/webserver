@@ -13,27 +13,17 @@ endif ()
 
 add_compile_definitions(MG_ENABLE_OPENSSL=1)
 
-if (NOT ("${CMAKE_BUILD_TYPE}" STREQUAL "Release"))
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O0")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O0")
-    message("Disabled optimization flags for use in profiler.")
-else ()
+if ("${CMAKE_BUILD_TYPE}" STREQUAL "Release")
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Ofast")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Ofast")
     message("Enabled optimization compiler flags.")
+else ()
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O0")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O0")
+    message("Disabled optimization flags for use in profiler.")
 endif ()
 
-set(resource_files
-        "resources/error.html"
-        "resources/favicon.ico"
-        "resources/index.html"
-        "resources/article.html"
-        "resources/register.html"
-        "resources/confirm.html"
-        "resources/dashboard.html"
-        "resources/bootstrap.css"
-        "resources/CascadiaMono.woff"
-)
+file(GLOB resource_files CONFIGURE_DEPENDS LIST_DIRECTORIES false "resources/*")
 
 # Creates C resources file from files in given directory
 function(create_resources output)

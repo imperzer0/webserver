@@ -38,8 +38,8 @@
 #define COLORED_ERROR(color) color, COLOR_##color
 
 
-extern std::set<std::string> server_confirm_email_hosts_whitelist;
-extern std::set<std::string> server_confirm_email_hosts_blacklist;
+extern std::set<std::string> server_verification_email_hosts_whitelist;
+extern std::set<std::string> server_verification_email_hosts_blacklist;
 
 #ifdef ENABLE_FILESYSTEM_ACCESS
 extern void register_additional_handlers();
