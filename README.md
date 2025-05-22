@@ -1,13 +1,23 @@
 # webserver
 
-Lightweight c++ web server for archlinux with ftp (available in docker container)
+Lightweight c++ web server for linux with ftp (available in docker container)
 
 ## Installation
 
 #### Archlinux
 
+Use [PKGBUILD](PKGBUILD) to make and install the package
+
 ```bash
 makepkg -sif
+```
+
+#### Debian
+
+Use [makepkg.sh](debpkg%2Fmakepkg.sh) to build and install the package
+
+```bash
+bash makepkg.sh -i
 ```
 
 #### Docker
@@ -25,18 +35,18 @@ docker build --rm -t webserver .
 5. After that you should see entry called `App passwords`, that's what we need: go there.
 6. Tap on `Select app` field.
 7. Choose entry `Other (custom name)` from dropdown menu.
-8. Call it somehow. For example, I used label `smtp`.
+8. Call it somehow. For example: `smtp_webserver`.
 9. Press button called `Generate`.
-10. Here you should see key that looks like this `wagy hdfr jwar ydyp`.
+10. Here you should see the key that looks like this `wlgf hdfr jwsr ydrg`.
 11. Copy it.
-12. Then go to command prompt and enter commands above, replacing `<account>` with your gmail account name
-    and `<password>` with the key, you just copied.
+12. Then go to command prompt and enter [commands below](#Deploy), replacing `<account>` with your gmail account name
+    and `<auth_key>` with the key, you just copied.
 
 ## Deploy
 
-### ArchLinux
+### Linux
 
-First you need generate ssl certificates (only once)
+First you need to generate ssl certificates (only once)
 
 ```bash
 sudo mkdir -p /srv/certs/
@@ -53,12 +63,13 @@ echo -e "CASUBJ=\"/C=UA/ST=Ukraine/L=Zakarpattia/O=imperzer0/CN=CAwebserver\";\n
   >generator.bash && chmod +x generator.bash && bash generator.bash
 ```
 
-Then navigate to `website` directory and run commands
+Then, in order to run the server, navigate to the website's home directory and run commands.
+Replace `<account>@gmail.com` with your email address and `<auth_key>` with [the key](#Setup-email) you just generated.
 
 ```bash
 sudo mkdir -p /srv/webserver/
 cd /srv/webserver/
-webserver --tls /srv/certs/ --email="<account>@gmail.com" --email-password="<password>"
+webserver --tls /srv/certs/ --email="<account>@gmail.com" --email-password="<auth_key>"
 ```
 
 ### Docker
@@ -72,12 +83,14 @@ docker volume create webserver_etc
 docker run --network=host -v webserver_certificates:/srv/certs \
            -v webserver_data:/srv/webserver \
            -v webserver_etc:/etc --name webserver -it webserver \
-           --email="<account>@gmail.com" --email-password="<password>"
+           --email="<account>@gmail.com" --email-password="<auth_key>"
 ```
 
 ## Modification
 
-`webserver` is flexible application.
-If you want to implement custom functionality, do so in `config.cpp`.
-Follow the guidelines in the comments to configure it properly.
-Avoid editing other files to keep the application stable.
+`webserver` is a flexible application.<br/>
+If you want to implement custom functionality,<br/>
+I recommend doing so in `config.cpp`.<br/>
+Follow the guidelines in the comments to configure it properly.<br/>
+I *don't recommend* touching any other files for it can make the app unstable<br/>
+if you don't completely understand what they do, but you can definitely try.<br/>

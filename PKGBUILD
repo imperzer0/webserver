@@ -2,9 +2,9 @@
 # Maintained by imper <imperator999mcpe@gmail.com>
 
 pkgname=webserver
-pkgver=2.10
+pkgver=2.11
 pkgrel=0
-pkgdesc='Lightweight c++ web server for archlinux with ftp'
+pkgdesc='Lightweight c++ web server for linux with ftp'
 author="imperzer0"
 arch=('any')
 url=https://github.com/$author/$pkgname
@@ -31,7 +31,7 @@ _rcfiles=(
   "index.html"
   "article.html"
   "register.html"
-  "confirm.html"
+  "verify.html"
   "dashboard.html"
   "bootstrap.css"
 )

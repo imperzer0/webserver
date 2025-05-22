@@ -20,9 +20,9 @@
 extern const char* http_address;
 extern const char* https_address;
 extern const char* tls_path;
-extern const char* server_confirm_email;
-extern const char* server_confirm_email_password;
-extern const char* server_confirm_smtp_server;
+extern const char* server_verification_email;
+extern const char* server_verification_email_password;
+extern const char* server_verification_smtp_server;
 extern int log_level, hexdump;
 
 #ifdef ENABLE_FILESYSTEM_ACCESS

@@ -53,7 +53,7 @@ void execute_next_time(
 #endif
 
 
-/// Register user-defined path ftp_handlers
+/// Register user-defined web path and ftp handlers
 void register_additional_handlers()
 {
 	// TODO: You can create your own handlers over here
@@ -62,19 +62,21 @@ void register_additional_handlers()
 	// 		"PATH", "DESCRIPTION",
 	// 		[](struct mg_connection* connection, struct mg_http_message* msg)
 	// 		{
-	//
+	//          **Your code Here**
 	// 		}
 	// );
 	//
 	// add_custom_ftp_handler(
 	// 		[](const std::string& ftp_command, const std::string& parameters)
 	// 		{
-	//
+	//          **Your code Here**
 	// 		}
 	// );
 
 
 #ifdef ENABLE_FILESYSTEM_ACCESS
+	// Here is an exmple of a dashboard that shows statistics on uploaded files
+	// implemented as web path and ftp handlers
 	register_path_handler(
 			"/dashboard", "View statistics on dashboard",
 			[](struct mg_connection* connection, struct mg_http_message* msg) {
@@ -154,10 +156,10 @@ void register_additional_handlers()
 /// Note: If you leave the list empty it will not take any effect
 ///
 
-std::set<std::string> server_confirm_email_hosts_whitelist {
+std::set<std::string> server_verification_email_hosts_whitelist {
 		// Add hostnames here as comma separated list of strings: "str1", "str2", "str3" ... "strn"
 };
 
-std::set<std::string> server_confirm_email_hosts_blacklist {
+std::set<std::string> server_verification_email_hosts_blacklist {
 		// Add hostnames here as comma separated list of strings: "str1", "str2", "str3" ... "strn"
 };

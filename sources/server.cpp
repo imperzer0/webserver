@@ -15,8 +15,13 @@
 
 
 #ifdef ENABLE_FILESYSTEM_ACCESS
+
+#include "../ftp/ftp_event_handler.h"
 #include <fineftp/server.h>
+
+
 #endif
+
 
 #include <map>
 #include <ftw.h>
@@ -28,9 +33,9 @@ typedef id_t uint32_t;
 const char* http_address = DEFAULT_HTTP_SERVER_ADDRESS;
 const char* https_address = DEFAULT_HTTPS_SERVER_ADDRESS;
 const char* tls_path = nullptr;
-const char* server_confirm_email = nullptr;
-const char* server_confirm_email_password = nullptr;
-const char* server_confirm_smtp_server = "smtps://smtp.gmail.com:465";
+const char* server_verification_email = nullptr;
+const char* server_verification_email_password = nullptr;
+const char* server_verification_smtp_server = "smtps://smtp.gmail.com:465";
 int log_level = 2, hexdump = 0;
 
 #ifdef ENABLE_FILESYSTEM_ACCESS
@@ -81,11 +86,13 @@ inline static void load_users();
 inline static void save_users();
 
 #ifdef ENABLE_FILESYSTEM_ACCESS
+
 /// Create all registered users on ftp server
 inline static void forward_all_users();
 
 /// Create registered user on ftp server
 inline static void add_user(decltype(*registered_users.begin())& reg_user);
+
 #endif
 
 
@@ -105,8 +112,10 @@ inline void handle_index_html(struct mg_connection* connection, struct mg_http_m
 inline void handle_favicon_ico(struct mg_connection* connection, struct mg_http_message* msg);
 
 #ifdef ENABLE_FILESYSTEM_ACCESS
+
 /// Handle filesystem access (serve directory)
 inline void handle_dir_html(struct mg_connection* connection, struct mg_http_message* msg);
+
 #endif
 
 /// Handle user registration form access
@@ -115,8 +124,8 @@ inline void handle_register_form_html(struct mg_connection* connection, struct m
 /// Handle user registration request
 inline void handle_register_html(struct mg_connection* connection, struct mg_http_message* msg);
 
-/// Handle user email confirmation request
-inline void handle_confirm_html(struct mg_connection* connection, struct mg_http_message* msg);
+/// Handle user email verification request
+inline void handle_verify_html(struct mg_connection* connection, struct mg_http_message* msg);
 
 /// Handle other resources request
 inline void handle_resources_html(struct mg_connection* connection, struct mg_http_message* msg);
@@ -137,15 +146,17 @@ void register_path_handler(
 	if (!handlers_head)
 	{
 		handlers = new registered_path_handlers {
-				.data = new registered_path_handler { .path = path, .description = description, .fn = fn, .restriction_type = type },
-				.next = nullptr };
+				.data = new registered_path_handler {.path = path, .description = description, .fn = fn, .restriction_type = type},
+				.next = nullptr
+		};
 		handlers_head = handlers;
 	}
 	else
 	{
 		handlers_head->next = new registered_path_handlers {
-				.data = new registered_path_handler { .path = path, .description = description, .fn = fn, .restriction_type = type },
-				.next = nullptr };
+				.data = new registered_path_handler {.path = path, .description = description, .fn = fn, .restriction_type = type},
+				.next = nullptr
+		};
 		handlers_head = handlers_head->next;
 	}
 }
@@ -199,8 +210,8 @@ inline void handle_http_message(struct mg_connection* connection, struct mg_http
 		handle_register_form_html(connection, msg);
 	else if (mg_http_match_uri(msg, "/register"))
 		handle_register_html(connection, msg);
-	else if (starts_with(msg->uri.ptr, "/confirm/"))
-		handle_confirm_html(connection, msg);
+	else if (starts_with(msg->uri.ptr, "/verify/"))
+		handle_verify_html(connection, msg);
 	else if (starts_with(msg->uri.ptr, "/resources/"))
 		handle_resources_html(connection, msg);
 	else handle_registered_paths(connection, msg);
@@ -237,22 +248,22 @@ void client_handler(struct mg_connection* connection, int ev, void* ev_data, voi
 /// Initialize server
 void server_initialize()
 {
-	if (server_confirm_email != nullptr && server_confirm_email_password == nullptr)
+	if (server_verification_email != nullptr && server_verification_email_password == nullptr)
 	{
-		puts("[Server] Error occurred in server initialization: Confirmator email's password was not specified.");
+		puts("[Server] An error occurred during server initialization: No password was given for verification email.");
 		exit(-3);
 	}
 
-	if (server_confirm_email == nullptr || *server_confirm_email == 0)
+	if (server_verification_email == nullptr || *server_verification_email == 0)
 	{
-		puts("[Server] ======= Important information ======");
-		puts("[Server] Confirmator email was not specified. Entering unsafe mode!!!");
-		puts("[Server] !!! Pay attention! Your server could be vulnerable to spam attack! !!!");
-		puts("[Server] Please, consider creating a google account and set it up with email verification.");
-		puts("[Server] ======= Important information ======");
-		delete[] server_confirm_email;
-		delete[] server_confirm_email_password;
-		server_confirm_email = server_confirm_email_password = nullptr;
+		puts("[Server] ======= HEADS UP ======");
+		puts("[Server] Verification email was not configured. Entering unsafe mode!!!");
+		puts("[Server] !!! Heads up! Your server is vulnerable to spam attacks! !!!");
+		puts("[Server] Please, consider creating a google account and set it up as verification email.");
+		puts("[Server] ======= HEADS UP ======");
+		delete[] server_verification_email;
+		delete[] server_verification_email_password;
+		server_verification_email = server_verification_email_password = nullptr;
 	}
 
 	// Initialize the libcurl library
@@ -416,7 +427,7 @@ static void list_dir(struct mg_connection* c, struct mg_http_message* hm, const 
 			"}"
 			"</script>";
 	struct mg_fs* fs = opts->fs == nullptr ? &mg_fs_posix : opts->fs;
-	struct printdirentrydata d = { c, hm, opts, dir };
+	struct printdirentrydata d = {c, hm, opts, dir};
 	char tmp[10], buf[MG_PATH_MAX];
 	size_t off, n;
 	int len = mg_url_decode(hm->uri.ptr, hm->uri.len, buf, sizeof(buf), 0);
@@ -483,6 +494,7 @@ void serve_dir(struct mg_connection* c, struct mg_http_message* hm, const struct
 }
 
 #ifdef ENABLE_FILESYSTEM_ACCESS
+
 inline void handle_dir_html(struct mg_connection* connection, struct mg_http_message* msg)
 {
 	MG_INFO(("Serving /dir/ to %M...", mg_print_ip, &connection->rem));
@@ -509,7 +521,7 @@ inline void handle_dir_html(struct mg_connection* connection, struct mg_http_mes
 		return;
 	}
 
-	struct mg_http_serve_opts opts { .root_dir = cwd.c_str() };
+	struct mg_http_serve_opts opts {.root_dir = cwd.c_str()};
 	std::string extra_header;
 
 	if (st.st_size > MAX_INLINE_FILE_SIZE)
@@ -537,6 +549,7 @@ inline void handle_dir_html(struct mg_connection* connection, struct mg_http_mes
 
 	serve_dir(connection, &msg2, &opts);
 }
+
 #endif
 
 
@@ -547,10 +560,10 @@ inline void handle_register_form_html(struct mg_connection* connection, struct m
 }
 
 
-inline void send_confirmation_notification_page_html(struct mg_connection* connection)
+inline void send_verification_notification_page_html(struct mg_connection* connection)
 {
-	MG_INFO(("Sending email confirmation page to %M...", mg_print_ip, &connection->rem));
-	mg_http_reply(connection, 200, "Content-Type: text/html\r\n", RESOURCE(confirm_html));
+	MG_INFO(("Sending email verification page to %M...", mg_print_ip, &connection->rem));
+	mg_http_reply(connection, 200, "Content-Type: text/html\r\n", RESOURCE(verify_html));
 }
 
 typedef struct
@@ -581,15 +594,15 @@ inline id_t generate_id_and_send_email(struct mg_connection* connection, struct 
 	if (email_hostaddr_pos == std::string::npos)
 		return 0;
 
-	if (!server_confirm_email_hosts_whitelist.empty() &&
-	    !server_confirm_email_hosts_whitelist.contains(email.substr(email_hostaddr_pos + 1)))
+	if (!server_verification_email_hosts_whitelist.empty() &&
+	    !server_verification_email_hosts_whitelist.contains(email.substr(email_hostaddr_pos + 1)))
 	{
 		send_error_html(connection, COLORED_ERROR(406), "This email service provider is not allowed");
 		return 0;
 	}
 
-	if (!server_confirm_email_hosts_blacklist.empty() &&
-	    server_confirm_email_hosts_blacklist.contains(email.substr(email_hostaddr_pos + 1)))
+	if (!server_verification_email_hosts_blacklist.empty() &&
+	    server_verification_email_hosts_blacklist.contains(email.substr(email_hostaddr_pos + 1)))
 	{
 		send_error_html(connection, COLORED_ERROR(406), "This email service provider is not allowed");
 		return 0;
@@ -599,7 +612,7 @@ inline id_t generate_id_and_send_email(struct mg_connection* connection, struct 
 
 	if (server_address == nullptr)
 	{
-		send_error_html(connection, COLORED_ERROR(500), "Can't generate a confirmation link");
+		send_error_html(connection, COLORED_ERROR(500), "Can't generate a verification link");
 		return 0;
 	}
 
@@ -618,36 +631,37 @@ inline id_t generate_id_and_send_email(struct mg_connection* connection, struct 
 	if (!curl)
 	{
 		MG_ERROR(("[Send Email] Unable to initialize curl."));
-		send_error_html(connection, COLORED_ERROR(500), "Can't generate a confirmation link");
+		send_error_html(connection, COLORED_ERROR(500), "Can't generate a verification link");
 		return 0;
 	}
 
 	// Set the SMTP server and port
-	curl_easy_setopt(curl, CURLOPT_URL, server_confirm_smtp_server);
+	curl_easy_setopt(curl, CURLOPT_URL, server_verification_smtp_server);
 
 	// Set the username and password for authentication
-	curl_easy_setopt(curl, CURLOPT_USERNAME, server_confirm_email);
-	curl_easy_setopt(curl, CURLOPT_PASSWORD, server_confirm_email_password);
+	curl_easy_setopt(curl, CURLOPT_USERNAME, server_verification_email);
+	curl_easy_setopt(curl, CURLOPT_PASSWORD, server_verification_email_password);
 
 	std::string link = "http" + std::string(connection->is_tls ? "s" : "") +
-	                   "://" + server_address_str + "/confirm/" + std::to_string(id);
+	                   "://" + server_address_str + "/verify/" + std::to_string(id);
 
 	// Define email message
 	std::string message = "To: " + email + "\r\n" +
-	                      "From: " + server_confirm_email + "\r\n" +
+	                      "From: " + server_verification_email + "\r\n" +
 	                      "Subject: Confirm registration of new account\r\n"
 	                      "\r\n"
-	                      "To complete registration open link " + link + " in any available browser.";
+	                      "To verify your email account and complete the registration process open link " + link +
+	                      " in any available web browser.";
 
 	MG_INFO(("Sending link [%s] to [%s]", link.c_str(), email.c_str()));
 
 	struct curl_slist* recipients = nullptr;
-	curl_easy_setopt(curl, CURLOPT_MAIL_FROM, server_confirm_email);
+	curl_easy_setopt(curl, CURLOPT_MAIL_FROM, server_verification_email);
 	recipients = curl_slist_append(recipients, email.c_str());
 	curl_easy_setopt(curl, CURLOPT_MAIL_RCPT, recipients);
 
 	curl_easy_setopt(curl, CURLOPT_READFUNCTION, curl_read_callback_email_data);
-	MessageData data { .message = message, .pos = 0 };
+	MessageData data {.message = message, .pos = 0};
 	curl_easy_setopt(curl, CURLOPT_READDATA, &data);
 	curl_easy_setopt(curl, CURLOPT_UPLOAD, 1L);
 	curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
@@ -702,9 +716,9 @@ inline void handle_register_html(struct mg_connection* connection, struct mg_htt
 		return;
 	}
 
-	if (server_confirm_email == nullptr)
+	if (server_verification_email == nullptr)
 	{
-		auto user = registered_users.insert({ login, { email, password }});
+		auto user = registered_users.insert({login, {email, password}});
 		if (!user.second)
 		{
 			send_error_html(connection, COLORED_ERROR(500), "Could not insert user");
@@ -722,27 +736,27 @@ inline void handle_register_html(struct mg_connection* connection, struct mg_htt
 		id_t id = generate_id_and_send_email(connection, msg, email);
 		if (id == 0) return;
 
-		registered_users_pending[id] = { login, { email, password }};
-		send_confirmation_notification_page_html(connection);
+		registered_users_pending[id] = {login, {email, password}};
+		send_verification_notification_page_html(connection);
 	}
 }
 
 
-inline void handle_confirm_html(struct mg_connection* connection, struct mg_http_message* msg)
+inline void handle_verify_html(struct mg_connection* connection, struct mg_http_message* msg)
 {
-	if (server_confirm_email == nullptr)
+	if (server_verification_email == nullptr)
 	{
 		send_error_html(connection, COLORED_ERROR(405), "Email authorization in disabled");
 		return;
 	}
 
-	MG_INFO(("Processing confirmation request from %M...", mg_print_ip, &connection->rem));
+	MG_INFO(("Processing verification request from %M...", mg_print_ip, &connection->rem));
 	if (mg_strcmp(msg->method, mg_str("GET"))) return;
 
 	char* id_ptr = nullptr;
 
 	std::string uri(msg->uri.ptr, msg->uri.len);
-	strscanf(uri.c_str(), "/confirm/%s", &id_ptr);
+	strscanf(uri.c_str(), "/verify/%s", &id_ptr);
 
 	std::string id_str(secure_path(id_ptr ? id_ptr : ""));
 	delete[] id_ptr;
@@ -863,7 +877,7 @@ inline static void load_users()
 			char email[HOST_NAME_MAX + 1] { };
 			char password[HOST_NAME_MAX + 1] { };
 			if (::fscanf(file, "%s : %s : %s\n", username, email, password) == 3) // Scan line in format "<user> : <password>\n"
-				registered_users[username] = { email, password }; // Store username and password
+				registered_users[username] = {email, password}; // Store username and password
 		}
 		::fclose(file);
 	}
@@ -885,6 +899,7 @@ inline static void save_users()
 
 
 #ifdef ENABLE_FILESYSTEM_ACCESS
+
 inline static void forward_all_users()
 {
 	std::string cwd(getcwd());
@@ -912,6 +927,7 @@ inline static void add_user(decltype(*registered_users.begin())& reg_user)
 		ftp_server.addUser(reg_user.first, reg_user.second.second, root_dir, fineftp::Permission::All);
 	}
 }
+
 #endif
 
 
@@ -1010,7 +1026,7 @@ inline void http_send_resource(
 	// Track to-be-sent content length at the end of connection->data, aligned
 	size_t* clp = (size_t*)&connection->data[(sizeof(connection->data) - sizeof(size_t)) /
 	                                         sizeof(size_t) * sizeof(size_t)];
-	connection->pfn_data = new str_buf_fd { .data = rcdata, .len = rcsize, .pos = 0 };
+	connection->pfn_data = new str_buf_fd {.data = rcdata, .len = rcsize, .pos = 0};
 	*clp = (size_t)cl;  // Track to-be-sent content length
 }
 
