@@ -37,7 +37,6 @@ copy_files() {
     "custom_event_handler.hpp"
     "ftp_event_handler.h"
     "ftp_session.cpp.patch"
-    "ftp_user.h"
   )
 
   for _src in ${source[*]}; do
@@ -49,7 +48,6 @@ copy_files() {
     '5e27098d89d601bc9c05f7ff0478e269dc70db04e030dfae7223c1881a6a618f5aafcdd0861550f51c2dda52ee314f8c5dc7676538dc0021c719d5a7a5b65eec'
     '6851b6a62b8d13e9d2ee96d83e28077df9df00d0b41fb4655856ba53b10c039969356f2a8e25f84875d58f4fdcc8f82be923f9570dca63ac3eb61027ac491546'
     'd2b4ee65af0cefacec0558943102276730fd14db4cfd0095579809aaa3136dd3e7dbb634ff7847bad09ee205c06d0b6b64b0d9345155eb8619960e1f8d3b7636'
-    'e375d46d6236f45050b6ad978dea189896d568a1261848bf855045b6b62c0df9637f8f2b9e0f8df483869c0b9d55ebf1f725c468eac4466da7da07b5795ca1b4'
   )
 
   for i in ${!source[*]}; do
@@ -107,9 +105,7 @@ Priority: optional
 Maintainer: imperzer0 <dmytroperets@gmail.com>
 Architecture: $(dpkg --print-architecture)
 Depends: libasio-dev
-Description: C++ FTP Server Library
-
-📦 C++ FTP Server Library for Windows 🪟, Linux 🐧 & more 💾
+Description: 📦 C++ FTP Server Library for Windows 🪟, Linux 🐧 & more 💾
 EOF
 }
 

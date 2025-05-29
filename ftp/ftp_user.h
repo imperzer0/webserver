@@ -1,7 +1,3 @@
-//
-// Created by imper on 12/18/22.
-//
-
 #ifndef WEBSERVER_FTP_USER_H
 #define WEBSERVER_FTP_USER_H
 

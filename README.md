@@ -9,14 +9,16 @@ Lightweight c++ web server for linux with ftp (available in docker container)
 Use [PKGBUILD](archpackage/PKGBUILD) to make and install the package
 
 ```bash
+cd archpackage;
 makepkg -sif
 ```
 
 #### Debian
 
-Use [makepkg.sh](debpkg%2Fmakepkg.sh) to build and install the package
+Use [makepkg.sh](debpackage/makepkg.sh) to build and install the package
 
 ```bash
+cd debpackage;
 bash makepkg.sh -i
 ```
 
