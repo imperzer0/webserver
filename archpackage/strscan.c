@@ -1,1 +1,1 @@
-../strscan.c
+../strscan/strscan.c

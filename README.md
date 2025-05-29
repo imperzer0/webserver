@@ -6,7 +6,7 @@ Lightweight c++ web server for linux with ftp (available in docker container)
 
 #### Archlinux
 
-Use [PKGBUILD](PKGBUILD) to make and install the package
+Use [PKGBUILD](archpackage/PKGBUILD) to make and install the package
 
 ```bash
 makepkg -sif
