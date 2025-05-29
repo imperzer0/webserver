@@ -1,7 +1,4 @@
 #!/bin/bash
-#!/bin/bash
-# Maintained by imper <imperator999mcpe@gmail.com>
-
 pkgname=fineftp-server
 pkgver=1.3.5
 pkgdesc="FineFTP is a minimal FTP server library for Windows and Unix flavors"
@@ -13,12 +10,15 @@ pkgdir="$(pwd)/$pkgname"
 srcdir="$(pwd)/src"
 
 
-mksrc() {
-  echo "-> mksrc($pkgname) in $(pwd)"
+init_dirs() {
+  echo "-> init_dirs($pkgname) in $(pwd)"
 
-  rm -rfv src && echo "Removed old source directory" || exit 1;
-  mkdir -pv src;
-  cd src || exit 1;
+  rm -rfv "$srcdir" && echo "Removed old source directory" || exit 1;
+  rm -rfv "$pkgdir" && echo "Removed old package directory" || exit 1;
+  mkdir -pv "$srcdir";
+  mkdir -pv "$pkgdir";
+
+  cd "$srcdir" || exit 1;
 }
 
 download_sources() {
@@ -40,7 +40,7 @@ copy_files() {
     "ftp_session.cpp.patch"
   )
 
-  for _src in ${source[@]}; do
+  for _src in ${source[*]}; do
     cp -rfv "$_srcprefix/$_src" "$srcdir";
   done
 
@@ -51,7 +51,7 @@ copy_files() {
     'd2b4ee65af0cefacec0558943102276730fd14db4cfd0095579809aaa3136dd3e7dbb634ff7847bad09ee205c06d0b6b64b0d9345155eb8619960e1f8d3b7636'
   )
 
-  for i in ${!source[@]}; do
+  for i in ${!source[*]}; do
     echo -n "Checking sha512sum: ";
     echo "${sha512sums[i]} $srcdir/${source[i]}" | sha512sum --check || exit 3;
   done
@@ -64,8 +64,8 @@ copy_files() {
 
 install_deps() {
   echo "-> install_deps($pkgname)"
-  sudo apt install "${makedepends[@]}" || exit 10;
-  sudo apt-mark auto "${makedepends[@]}";
+  sudo apt install -y "${makedepends[*]}" || exit 10;
+  sudo apt-mark auto "${makedepends[*]}";
 }
 
 build() {
@@ -96,18 +96,34 @@ package() {
   cd "$_cwd" || exit 7;
 }
 
+create_control_file() {
+  mkdir -p "$pkgdir/DEBIAN"
+  cat <<EOF > "$pkgdir/DEBIAN/control"
+Package: $pkgname
+Version: $pkgver
+Essential: no
+Priority: optional
+Maintainer: imperzer0 <dmytroperets@gmail.com>
+Architecture: $(dpkg --print-architecture)
+Depends: libasio-dev
+Description: C++ FTP Server Library
+📦 C++ FTP Server Library for Windows 🪟, Linux 🐧 & more 💾
+EOF
+}
+
 dpkg_build() {
   echo "-> dpkg_build($pkgname) in $(pwd)"
 
   cd ..
-  dpkg-deb --build "./$pkgname" || exit 8;
+  dpkg-deb --verbose --build "./$pkgname" || exit 8;
 }
 
 
-mksrc;
+init_dirs;
 download_sources;
 copy_files;
 install_deps;
 build;
 package;
+create_control_file;
 dpkg_build;

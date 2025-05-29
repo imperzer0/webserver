@@ -1,14 +1,14 @@
 // Copyright (c) 2022 Perets Dmytro
-// Author: Perets Dmytro <imperator999mcpe@gmail.com>
+// Author: Perets Dmytro <dmytroperets@gmail.com>
 //
 // Personal usage is allowed only if this comment was not changed or deleted.
 // Commercial usage must be approved by the author of this comment.
 
 
 #include "server.h"
-#include "../mongoose.c"
+#include "../mongoose/mongoose.c"
 #include "constants.hpp"
-#include "../strscan.c"
+#include "../strscan/strscan.c"
 #include "../resources.hpp"
 #include "tools.h"
 #include "config.h"
@@ -55,21 +55,24 @@ static std::map<id_t, std::pair<std::string, std::pair<std::string, std::string>
 // Handle interrupts, like Ctrl-C
 static int s_signo = 0;
 
-static void signal_handler(int signo)
+/// Print detailed info about the signals and handle them as usual
+static void signal_handle_print_details(int signo)
 {
-	MG_ERROR(("[SIGNAL_HANDLER] Captured SIG%s(%d) \"%s\".", sigabbrev_np(signo), signo, sigdescr_np(signo)));
+	MG_ERROR(("[SIGNAL_HANDLER] Handling SIG%s(%d) \"%s\"...", sigabbrev_np(signo), signo, sigdescr_np(signo)));
+	// TODO: For better compatibility: Rollback to the previous signal handler, not the default one
 	signal(signo, SIG_DFL);
 	s_signo = signo;
 }
 
 
+/// A linked list of path handlers
 typedef struct __registered_path_handlers
 {
 	registered_path_handler* data = nullptr;
 	struct __registered_path_handlers* next = nullptr;
 } registered_path_handlers;
 
-static registered_path_handlers* handlers = nullptr;
+static registered_path_handlers* handlers_start = nullptr;
 static registered_path_handlers* handlers_head = nullptr;
 
 
@@ -79,18 +82,18 @@ inline bool rm_rf(const std::string& path);
 /// mkdir -p
 inline bool mkdir_p(const std::string& path);
 
-/// Load registered users from file
+/// Load registered users from the users file
 inline static void load_users();
 
-/// Save registered users to file
+/// Save registered users into the users file
 inline static void save_users();
 
 #ifdef ENABLE_FILESYSTEM_ACCESS
 
-/// Create all registered users on ftp server
+/// Create already registered users on ftp server (only for current session)
 inline static void forward_all_users();
 
-/// Create registered user on ftp server
+/// Create registered user on ftp server (only for current session)
 inline static void add_user(decltype(*registered_users.begin())& reg_user);
 
 #endif
@@ -113,15 +116,15 @@ inline void handle_favicon_ico(struct mg_connection* connection, struct mg_http_
 
 #ifdef ENABLE_FILESYSTEM_ACCESS
 
-/// Handle filesystem access (serve directory)
+/// Handle filesystem access (mongoose default serve directory)
 inline void handle_dir_html(struct mg_connection* connection, struct mg_http_message* msg);
 
 #endif
 
-/// Handle user registration form access
+/// Handle user registration form GET access
 inline void handle_register_form_html(struct mg_connection* connection, struct mg_http_message* msg);
 
-/// Handle user registration request
+/// Handle user registration POST request
 inline void handle_register_html(struct mg_connection* connection, struct mg_http_message* msg);
 
 /// Handle user email verification request
@@ -130,7 +133,7 @@ inline void handle_verify_html(struct mg_connection* connection, struct mg_http_
 /// Handle other resources request
 inline void handle_resources_html(struct mg_connection* connection, struct mg_http_message* msg);
 
-
+/// Get a map of registered users
 extern const auto* get_registered_users()
 {
 	return &registered_users;
@@ -145,37 +148,40 @@ void register_path_handler(
 	MG_INFO(("Registering '%s' => '%s' path...", description.c_str(), path.c_str()));
 	if (!handlers_head)
 	{
-		handlers = new registered_path_handlers {
-				.data = new registered_path_handler {.path = path, .description = description, .fn = fn, .restriction_type = type},
+		// If no entries - create one
+		handlers_start = new registered_path_handlers {
+				.data = new registered_path_handler { .path = path, .description = description, .fn = fn, .restriction_type = type },
 				.next = nullptr
 		};
-		handlers_head = handlers;
+		handlers_head = handlers_start;
 	}
 	else
 	{
+		// Otherwise, create a new entry after the head of the list
 		handlers_head->next = new registered_path_handlers {
-				.data = new registered_path_handler {.path = path, .description = description, .fn = fn, .restriction_type = type},
+				.data = new registered_path_handler { .path = path, .description = description, .fn = fn, .restriction_type = type },
 				.next = nullptr
 		};
+		// And move the head of the list
 		handlers_head = handlers_head->next;
 	}
 }
 
-/// Iterate through registered handlers and try handle them
+/// Iterate through registered handlers_start and try handle them
 inline void handle_registered_paths(struct mg_connection* connection, struct mg_http_message* msg)
 {
 	MG_INFO(("Handling non-builtin registered paths..."));
-	registered_path_handlers* root = handlers;
+	registered_path_handlers* root = handlers_start;
 
 	while (root && root->data)
 	{
 		switch (root->data->restriction_type)
 		{
-			case registered_path_handler::STRICT:
+			case registered_path_handler::STRICT: // The entire path has to match
 				if (mg_http_match_uri(msg, root->data->path.c_str()))
 					goto exit_loop;
 				break;
-			case registered_path_handler::SOFT:
+			case registered_path_handler::SOFT: // Only the beginning has to match
 				if (starts_with(msg->uri.ptr, root->data->path.c_str()))
 					goto exit_loop;
 				break;
@@ -185,35 +191,43 @@ inline void handle_registered_paths(struct mg_connection* connection, struct mg_
 
 	exit_loop:
 
-	if (root && root->data)
+	if (root && root->data) // If it's not empty
 	{
 		MG_INFO(("Handling '%s' => '%s' path for IP %M...", root->data->description.c_str(), root->data->path.c_str(),
 				mg_print_ip, &connection->rem));
-		return root->data->fn(connection, msg);
+		return root->data->fn(connection, msg); // Run the handler and quit after
 	}
 
 	send_error_html(connection, COLORED_ERROR(404), "");
 }
 
-
+// Serve appropriate resources and perform actions upon client's request
 inline void handle_http_message(struct mg_connection* connection, struct mg_http_message* msg)
 {
+	// Serve index.html resource on '/', '/index.html' and '/index'
 	if (mg_http_match_uri(msg, "/") || mg_http_match_uri(msg, "/index.html") || mg_http_match_uri(msg, "/index"))
 		handle_index_html(connection, msg);
+		// Serve favicon.ico resource on '/favicon.ico' and '/favicon'
 	else if (mg_http_match_uri(msg, "/favicon.ico") || mg_http_match_uri(msg, "/favicon"))
 		handle_favicon_ico(connection, msg);
 #ifdef ENABLE_FILESYSTEM_ACCESS
+		// Let the user browse directories on '/dir/...'
 	else if (starts_with(msg->uri.ptr, "/dir/"))
 		handle_dir_html(connection, msg);
 #endif
+		// Serve register.html on '/register-form'
 	else if (mg_http_match_uri(msg, "/register-form"))
 		handle_register_form_html(connection, msg);
+		// Receive data from registration form
 	else if (mg_http_match_uri(msg, "/register"))
 		handle_register_html(connection, msg);
+		// Verify email address and serve verify.html
 	else if (starts_with(msg->uri.ptr, "/verify/"))
 		handle_verify_html(connection, msg);
+		// Serve built-in resource files
 	else if (starts_with(msg->uri.ptr, "/resources/"))
 		handle_resources_html(connection, msg);
+		// Handle other paths registered in [config.cpp]
 	else handle_registered_paths(connection, msg);
 }
 
@@ -221,24 +235,25 @@ inline void handle_http_message(struct mg_connection* connection, struct mg_http
 /// Handle mongoose events
 void client_handler(struct mg_connection* connection, int ev, void* ev_data, void* fn_data)
 {
-	if (fn_data != nullptr && ev == MG_EV_ACCEPT)
+	if (fn_data != nullptr && ev == MG_EV_ACCEPT) // When user starts a session
 	{
-		std::string stls_path(tls_path);
-		if (!stls_path.ends_with('/')) stls_path += '/';
+		std::string stls_path(tls_path); // TLS Certificate and Key folder
+		if (!stls_path.ends_with('/')) stls_path += '/'; // always '/' at the end
 
-		std::string cert_path(stls_path);
+		std::string cert_path(stls_path); // Public Certificate
 		cert_path += "cert.pem";
 
-		std::string key_path(stls_path);
+		std::string key_path(stls_path); // Private Key
 		key_path += "key.pem";
 
+		// Make a structure to pass to mongoose
 		struct mg_tls_opts opts = {
-				.cert = cert_path.c_str(),   // Certificate PEM file
-				.key = key_path.c_str(), // This pem contains both cert and key
+				.cert = cert_path.c_str(),
+				.key = key_path.c_str(),
 		};
-		mg_tls_init(connection, &opts);
+		mg_tls_init(connection, &opts); // Initialize TLS Connection
 	}
-	else if (ev == MG_EV_HTTP_MSG)
+	else if (ev == MG_EV_HTTP_MSG) // When user requests pages and other data
 	{
 		auto* msg = static_cast<mg_http_message*>(ev_data);
 		handle_http_message(connection, msg);
@@ -248,43 +263,51 @@ void client_handler(struct mg_connection* connection, int ev, void* ev_data, voi
 /// Initialize server
 void server_initialize()
 {
+	// If the email has been defined, but the password is empty
 	if (server_verification_email != nullptr && server_verification_email_password == nullptr)
 	{
 		puts("[Server] An error occurred during server initialization: No password was given for verification email.");
 		exit(-3);
 	}
 
-	if (server_verification_email == nullptr || *server_verification_email == 0)
+	// If no email has been defined
+	if (server_verification_email == nullptr || *server_verification_email == 0) // <- terminating character
 	{
+		// Print a warning
 		puts("[Server] ======= HEADS UP ======");
 		puts("[Server] Verification email was not configured. Entering unsafe mode!!!");
 		puts("[Server] !!! Heads up! Your server is vulnerable to spam attacks! !!!");
 		puts("[Server] Please, consider creating a google account and set it up as verification email.");
 		puts("[Server] ======= HEADS UP ======");
+
+		// If still not nullptr - delete it
 		delete[] server_verification_email;
 		delete[] server_verification_email_password;
+		// And set to nullptr
 		server_verification_email = server_verification_email_password = nullptr;
 	}
 
-	// Initialize the libcurl library
+	// Initialize libcurl library
 	curl_global_init(CURL_GLOBAL_ALL);
 
-	signal(SIGINT, signal_handler);
-	signal(SIGTERM, signal_handler);
-	signal(SIGQUIT, signal_handler);
+	// Handle SIGNALS properly
+	signal(SIGINT, signal_handle_print_details);
+	signal(SIGTERM, signal_handle_print_details);
+	signal(SIGQUIT, signal_handle_print_details);
 
-	mg_log_set(log_level);
-	mg_mgr_init(&manager);
+	mg_log_set(log_level); // Set log level for mongoose
+	mg_mgr_init(&manager); // Initialize mongoose
 
 #ifdef ENABLE_FILESYSTEM_ACCESS
-	if (log_level >= 2)
+	if (log_level >= MG_LL_INFO)
 	{
+		// Print all ftp commends executed on the server
 		add_custom_ftp_handler(
 				[](
 						const std::string& ftp_command, const std::string& parameters, const std::string& ftp_working_directory,
 						std::shared_ptr<::fineftp::FtpUser> ftp_user
 				) {
-					mutex_locker l(&ftp_callback_mutex);
+					mutex_locker l(&ftp_callback_mutex); // Async
 					MG_INFO((" [FTP] %s %s", ftp_command.c_str(), parameters.c_str()));
 				}
 		);
@@ -292,8 +315,9 @@ void server_initialize()
 #endif
 
 #ifdef ENABLE_FILESYSTEM_ACCESS
-	register_additional_handlers();
+	register_additional_handlers(); // from config.cpp
 
+	// Anonymous user can view everyone's files, but not edit
 	MG_INFO(("[FTP] Adding anonymous user to ftp server..."));
 	ftp_server.addUserAnonymous(getcwd(), fineftp::Permission::ReadOnly);
 #endif
@@ -310,14 +334,17 @@ void server_initialize()
 /// Start listening on given http_address and run server loop
 void server_run()
 {
-	if (!(http_server_connection = mg_http_listen(&manager, http_address, client_handler, nullptr)))
+	if (http_address)
 	{
-		MG_ERROR(
-				("Could not start listening on %s. Use 'http://ADDR:PORT' or just ':PORT' as http address parameter", http_address));
-		exit(EXIT_FAILURE);
+		if (!(http_server_connection = mg_http_listen(&manager, http_address, client_handler, nullptr)))
+		{
+			MG_ERROR(("Could not start listening on '%s'. Use 'http://ADDR:PORT' or just ':PORT' as http(s) address parameter",
+					http_address));
+			exit(EXIT_FAILURE);
+		}
 	}
 
-	if (tls_path)
+	if (tls_path && https_address)
 	{
 		if (!(https_server_connection = mg_http_listen(&manager, https_address, client_handler, (void*)1)))
 		{
@@ -327,21 +354,27 @@ void server_run()
 		}
 	}
 
-	if (hexdump)
-		http_server_connection->is_hexdumping = 1;
+	// Override HexDumping for http server
+	if (http_server_connection)
+		http_server_connection->is_hexdumping = hexdump;
 
-	if (hexdump && https_server_connection)
-		https_server_connection->is_hexdumping = 1;
-
-	auto cwd = getcwd();
-
-	MG_INFO((""));
-	MG_INFO(("Mongoose v" MG_VERSION));
-	MG_INFO(("Server is listening on : [%s]", http_address));
-	MG_INFO(("Web root directory  : [file://%s/]", cwd.c_str()));
-	MG_INFO((""));
-
+	// Override HexDumping for https server
 	if (https_server_connection)
+		https_server_connection->is_hexdumping = hexdump;
+
+	auto cwd = getcwd(); // Current Working Directory
+
+
+	if (http_server_connection) // HTTP
+	{
+		MG_INFO((""));
+		MG_INFO(("Mongoose v" MG_VERSION));
+		MG_INFO(("Server is listening on : [%s]", http_address));
+		MG_INFO(("Web root directory  : [file://%s/]", cwd.c_str()));
+		MG_INFO((""));
+	}
+
+	if (https_server_connection) // HTTPS
 	{
 		MG_INFO((""));
 		MG_INFO(("Mongoose v" MG_VERSION));
@@ -350,7 +383,7 @@ void server_run()
 		MG_INFO((""));
 	}
 
-#ifdef ENABLE_FILESYSTEM_ACCESS
+#ifdef ENABLE_FILESYSTEM_ACCESS // FTP Server
 	ftp_server.start(4);
 	MG_INFO(("[FTP]"));
 	MG_INFO(("[FTP] Started ftp server on : [ftp://%s:%d]", ftp_server.getAddress().c_str(), ftp_server.getPort()));
@@ -373,20 +406,24 @@ void server_run()
 inline void handle_index_html(struct mg_connection* connection, struct mg_http_message* msg)
 {
 	MG_INFO(("Serving index.html to %M...", mg_print_ip, &connection->rem));
+
 	std::string list_html;
-#ifdef ENABLE_FILESYSTEM_ACCESS
-	list_html += "<li><a href=\"/dir/\">Observe directory structure</a></li>\n";
+#ifdef ENABLE_FILESYSTEM_ACCESS // if filesystem is enabled
+	list_html += "<li><a href=\"/dir/\">Observe directory structure</a></li>\n"; // Add '/dir/' link
 #endif
-	list_html += "<li><a href=\"/register-form\">Create a new account</a></li>\n";
-	for (auto* i = handlers; i != nullptr && i->data != nullptr; i = i->next)
+	list_html += "<li><a href=\"/register-form\">Create a new account</a></li>\n"; // Add register link
+	// List other path handlers defined in config.cpp
+	for (auto* i = handlers_start; i != nullptr && i->data != nullptr; i = i->next)
 	{
 		list_html += "<li><a href=\"" + i->data->path + "\">" + i->data->description + "</a></li>\n";
 		MG_INFO(("Indexed '%s' => '%s'.", i->data->description.c_str(), i->data->path.c_str()));
 	}
 
+	// Add it to the article
 	char article_complete[LEN(article_html) + list_html.size() + 1];
 	sprintf(article_complete, RESOURCE(article_html), list_html.c_str());
 
+	// Send...
 	mg_http_reply(
 			connection, 200, "Content-Type: text/html\r\n",
 			RESOURCE(index_html), article_complete
@@ -397,12 +434,21 @@ inline void handle_index_html(struct mg_connection* connection, struct mg_http_m
 inline void handle_favicon_ico(struct mg_connection* connection, struct mg_http_message* msg)
 {
 	MG_INFO(("Serving favicon.ico to %M...", mg_print_ip, &connection->rem));
+	// Send...
 	http_send_resource(connection, msg, RESOURCE(favicon_ico), LEN(favicon_ico), "image/x-icon");
 }
 
 
+#ifdef ENABLE_FILESYSTEM_ACCESS
+
 static void list_dir(struct mg_connection* c, struct mg_http_message* hm, const struct mg_http_serve_opts* opts, char* dir)
 {
+	///
+	/// This is a copy of mongoose's built-in function <br>
+	/// mg_http_serve_dir() -> <b>listdir()</b> <br>
+	/// I don't guarantee the correctness of this function, because I just copied it :)
+	///
+
 	const char* sort_js_code =
 			"<script>function srt(tb, sc, so, d) {"
 			"var tr = Array.prototype.slice.call(tb.rows, 0),"
@@ -427,7 +473,7 @@ static void list_dir(struct mg_connection* c, struct mg_http_message* hm, const 
 			"}"
 			"</script>";
 	struct mg_fs* fs = opts->fs == nullptr ? &mg_fs_posix : opts->fs;
-	struct printdirentrydata d = {c, hm, opts, dir};
+	struct printdirentrydata d = { c, hm, opts, dir };
 	char tmp[10], buf[MG_PATH_MAX];
 	size_t off, n;
 	int len = mg_url_decode(hm->uri.ptr, hm->uri.len, buf, sizeof(buf), 0);
@@ -457,7 +503,7 @@ static void list_dir(struct mg_connection* c, struct mg_http_message* hm, const 
 			"<tr> <td colspan=\"3\"> <hr> </td> </tr>"
 			"</thead>"
 			"<tbody id=\"tb\">\n",
-			(int)uri.len, uri.ptr, sort_js_code, sort_js_code2, (int)uri.len, uri.ptr
+			MG_STR_PRINT(uri), sort_js_code, sort_js_code2, MG_STR_PRINT(uri)
 	);
 	mg_printf(
 			c, "%s",
@@ -467,6 +513,7 @@ static void list_dir(struct mg_connection* c, struct mg_http_message* hm, const 
 
 	fs->ls(dir, printdirentry, &d);
 	mg_printf(c, "</tbody><tfoot><tr><td colspan=\"3\"><hr></td></tr></tfoot> </table></body></html>\n");
+	// The purpose of the copy-paste is to remove <address>Mongoose v....</address> up here ^
 	n = mg_snprintf(tmp, sizeof(tmp), "%lu", (unsigned long)(c->send.len - off));
 	if (n > sizeof(tmp)) n = 0;
 	memcpy(c->send.buf + off - 12, tmp, n);  // Set content length
@@ -475,55 +522,65 @@ static void list_dir(struct mg_connection* c, struct mg_http_message* hm, const 
 
 void serve_dir(struct mg_connection* c, struct mg_http_message* hm, const struct mg_http_serve_opts* opts)
 {
+	///
+	/// This is a copy of mongoose's built-in function <b>mg_http_serve_dir()</b> <br>
+	/// I don't guarantee the correctness of this function, because I just copied it :)
+	///
+
 	char path[MG_PATH_MAX];
 	const char* sp = opts->ssi_pattern;
 	int flags = uri_to_path(c, hm, opts, path, sizeof(path));
 	if (flags < 0)
-		return; // Do nothing: the response has already been sent by uri_to_path()
-
-	if (flags & MG_FS_DIR)
+	{
+		// Do nothing: the response has already been sent by uri_to_path()
+	}
+	else if (flags & MG_FS_DIR)
 	{
 		list_dir(c, hm, opts, path);
-		return;
 	}
-
-	if (flags && sp != nullptr && mg_globmatch(sp, strlen(sp), path, strlen(path)))
+	else if (flags && sp != nullptr &&
+	         mg_globmatch(sp, strlen(sp), path, strlen(path)))
+	{
 		mg_http_serve_ssi(c, opts->root_dir, path);
+	}
 	else
+	{
 		mg_http_serve_file(c, hm, path, opts);
+	}
 }
-
-#ifdef ENABLE_FILESYSTEM_ACCESS
 
 inline void handle_dir_html(struct mg_connection* connection, struct mg_http_message* msg)
 {
 	MG_INFO(("Serving /dir/ to %M...", mg_print_ip, &connection->rem));
 	char* path = nullptr;
-	auto cwd = getcwd();
+	auto cwd = getcwd(); // Current Working Directory
 
 	std::string uri(msg->uri.ptr, msg->uri.len);
-	strscanf(uri.c_str(), "/dir/%s", &path);
+	strscanf(uri.c_str(), "/dir/%s", &path); // Extract path from uri
 
-	std::string spath(secure_path(path ? path : ""));
+	std::string spath(secure_path(path ? path : "")); // PATH string
 	delete[] path;
 
-	if (!spath.starts_with('/')) spath = "/" + spath;
+	if (!spath.starts_with('/')) spath = "/" + spath; // Make always start with a '/'
 
 	std::string sdpath(spath);
-	sdpath.reserve(sdpath.size() + 1);
+	sdpath.reserve(sdpath.size() + 1); // Set string buffer size
+	// Decode %XX encoded characters (makes it smaller, so won't overflow)
 	mg_url_decode(sdpath.c_str(), sdpath.size(), sdpath.data(), sdpath.size() + 1, 0);
-	sdpath = sdpath.data();
+	sdpath = sdpath.data(); // trim off data after '\0' left from overwriting itself
 
 	struct stat st { };
-	if (::stat((cwd + sdpath).c_str(), &st) != 0)
+	if (::stat((cwd + sdpath).c_str(), &st) != 0) // Check if path exists
 	{
-		send_error_html(connection, COLORED_ERROR(404), "");
+		send_error_html(connection, COLORED_ERROR(404), ""); // If no - error 404
 		return;
 	}
 
-	struct mg_http_serve_opts opts {.root_dir = cwd.c_str()};
+	// options for function serve_dir()
+	struct mg_http_serve_opts opts { .root_dir = cwd.c_str() };
 	std::string extra_header;
 
+	// If file is too big - serve as an attachment
 	if (st.st_size > MAX_INLINE_FILE_SIZE)
 	{
 		extra_header = "Content-Disposition: attachment; filename=\"";
@@ -533,9 +590,11 @@ inline void handle_dir_html(struct mg_connection* connection, struct mg_http_mes
 		opts.extra_headers = extra_header.c_str();
 	}
 
+	// Copy everything up to uri
 	std::string msgstrcp(msg->message.ptr, msg->uri.ptr);
 	msgstrcp += spath;
 
+	// Create fabricated http message for serve_dir()
 	struct mg_http_message msg2 { };
 	msg2.message = mg_str_n(msgstrcp.data(), msgstrcp.size());
 	msg2.uri = mg_str_n(msg2.message.ptr + (msg->uri.ptr - msg->message.ptr), spath.size());
@@ -661,7 +720,7 @@ inline id_t generate_id_and_send_email(struct mg_connection* connection, struct 
 	curl_easy_setopt(curl, CURLOPT_MAIL_RCPT, recipients);
 
 	curl_easy_setopt(curl, CURLOPT_READFUNCTION, curl_read_callback_email_data);
-	MessageData data {.message = message, .pos = 0};
+	MessageData data { .message = message, .pos = 0 };
 	curl_easy_setopt(curl, CURLOPT_READDATA, &data);
 	curl_easy_setopt(curl, CURLOPT_UPLOAD, 1L);
 	curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
@@ -684,7 +743,11 @@ inline id_t generate_id_and_send_email(struct mg_connection* connection, struct 
 inline void handle_register_html(struct mg_connection* connection, struct mg_http_message* msg)
 {
 	MG_INFO(("Processing registration request from %M...", mg_print_ip, &connection->rem));
-	if (mg_strcmp(msg->method, mg_str("POST"))) return;
+	if (mg_strcmp(msg->method, mg_str("POST")))
+	{
+		MG_ERROR(("Error parsing request: Invalid method: [%.*s]", MG_STR_PRINT(msg->method)));
+		return;
+	}
 
 	char login[HOST_NAME_MAX] { }, email[HOST_NAME_MAX] { }, password[HOST_NAME_MAX] { };
 	mg_http_get_var(&msg->body, "login", login, sizeof(login));
@@ -718,7 +781,7 @@ inline void handle_register_html(struct mg_connection* connection, struct mg_htt
 
 	if (server_verification_email == nullptr)
 	{
-		auto user = registered_users.insert({login, {email, password}});
+		auto user = registered_users.insert({ login, { email, password }});
 		if (!user.second)
 		{
 			send_error_html(connection, COLORED_ERROR(500), "Could not insert user");
@@ -736,7 +799,7 @@ inline void handle_register_html(struct mg_connection* connection, struct mg_htt
 		id_t id = generate_id_and_send_email(connection, msg, email);
 		if (id == 0) return;
 
-		registered_users_pending[id] = {login, {email, password}};
+		registered_users_pending[id] = { login, { email, password }};
 		send_verification_notification_page_html(connection);
 	}
 }
@@ -751,7 +814,11 @@ inline void handle_verify_html(struct mg_connection* connection, struct mg_http_
 	}
 
 	MG_INFO(("Processing verification request from %M...", mg_print_ip, &connection->rem));
-	if (mg_strcmp(msg->method, mg_str("GET"))) return;
+	if (mg_strcmp(msg->method, mg_str("GET")))
+	{
+		MG_ERROR(("Error parsing request: Invalid method: [%.*s]", MG_STR_PRINT(msg->method)));
+		return;
+	}
 
 	char* id_ptr = nullptr;
 
@@ -868,7 +935,7 @@ inline bool mkdir_p(const char* path)
 
 inline static void load_users()
 {
-	FILE* file = ::fopen("/etc/webserver.users", "rb");
+	FILE* file = ::fopen("/etc/webserver.users", "rb"); // Open users file
 	if (file)
 	{
 		while (!::feof(file))
@@ -876,8 +943,9 @@ inline static void load_users()
 			char username[HOST_NAME_MAX + 1] { };
 			char email[HOST_NAME_MAX + 1] { };
 			char password[HOST_NAME_MAX + 1] { };
-			if (::fscanf(file, "%s : %s : %s\n", username, email, password) == 3) // Scan line in format "<user> : <password>\n"
-				registered_users[username] = {email, password}; // Store username and password
+			if (::fscanf(file, "%s : %s : %s\n", username, email, password) ==
+			    3) // Scan line in format "<user> : <email> : <password>\n"
+				registered_users[username] = { email, password }; // Store user's credentials in RAM
 		}
 		::fclose(file);
 	}
@@ -967,7 +1035,7 @@ inline void http_send_resource(
 			"Content-Length: %llu\r\n"
 			"%s\r\n",
 			status, mg_http_status_code_str(status),
-			(int)mime.len, mime.ptr,
+			MG_STR_PRINT(mime),
 			cl,
 			range
 	);
@@ -976,6 +1044,8 @@ inline void http_send_resource(
 	{
 		connection->is_draining = 1;
 		connection->is_resp = 0;
+
+		MG_ERROR(("Error parsing request: Invalid method: [%.*s]", MG_STR_PRINT(msg->method)));
 		return;
 	}
 
@@ -1026,13 +1096,14 @@ inline void http_send_resource(
 	// Track to-be-sent content length at the end of connection->data, aligned
 	size_t* clp = (size_t*)&connection->data[(sizeof(connection->data) - sizeof(size_t)) /
 	                                         sizeof(size_t) * sizeof(size_t)];
-	connection->pfn_data = new str_buf_fd {.data = rcdata, .len = rcsize, .pos = 0};
+	connection->pfn_data = new str_buf_fd { .data = rcdata, .len = rcsize, .pos = 0 };
 	*clp = (size_t)cl;  // Track to-be-sent content length
 }
 
 
 inline void send_error_html(struct mg_connection* connection, int code, const char* color, const char* msg)
 {
+	MG_INFO(("Sending error message: Error %d \"%s\"...", code, msg));
 	mg_http_reply(
 			connection, code, "Content-Type: text/html\r\n", RESOURCE(error_html),
 			color, color, color, color, code, mg_http_status_code_str(code), msg

@@ -1,5 +1,5 @@
 // Copyright (c) 2022 Perets Dmytro
-// Author: Perets Dmytro <imperator999mcpe@gmail.com>
+// Author: Perets Dmytro <dmytroperets@gmail.com>
 //
 // Personal usage is allowed only if this comment was not changed or deleted.
 // Commercial usage must be approved by the author of this comment.
@@ -10,11 +10,14 @@
 
 #include <string>
 #include <map>
-#include "../mongoose.h"
+#include "../mongoose/mongoose.h"
 
 #ifdef ENABLE_FILESYSTEM_ACCESS
 #include "../ftp/ftp_event_handler.h"
 #endif
+
+
+#define MG_STR_PRINT(str) (int)str.len, str.ptr
 
 
 extern const char* http_address;

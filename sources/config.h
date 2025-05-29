@@ -1,5 +1,5 @@
 // Copyright (c) 2022 Perets Dmytro
-// Author: Perets Dmytro <imperator999mcpe@gmail.com>
+// Author: Perets Dmytro <dmytroperets@gmail.com>
 //
 // Personal usage is allowed only if this comment was not changed or deleted.
 // Commercial usage must be approved by the author of this comment.
@@ -10,8 +10,8 @@
 
 #include <set>
 
-/* Uncomment this macro to enable ftp server */
-//#define ENABLE_FILESYSTEM_ACCESS
+/* Uncomment this macro to enable ftp server and access to the filesystem on the server */
+#define ENABLE_FILESYSTEM_ACCESS
 
 
 #define COLOR_400 "rgba(147, 0, 0, 0.90)"
@@ -44,5 +44,9 @@ extern std::set<std::string> server_verification_email_hosts_blacklist;
 #ifdef ENABLE_FILESYSTEM_ACCESS
 extern void register_additional_handlers();
 #endif
+
+# ifndef MAX_RECENT_UPLOAD_RECORDS_COUNT
+#  define MAX_RECENT_UPLOAD_RECORDS_COUNT 20 // Used in the custom handlers demo
+# endif
 
 #endif //WEBSERVER_CONFIG_H

@@ -1,5 +1,5 @@
 // Copyright (c) 2022 Perets Dmytro
-// Author: Perets Dmytro <imperator999mcpe@gmail.com>
+// Author: Perets Dmytro <dmytroperets@gmail.com>
 //
 // Personal usage is allowed only if this comment was not changed or deleted.
 // Commercial usage must be approved by the author of this comment.
@@ -36,7 +36,7 @@ inline static consteval size_t static_strlen(const char* str)
 /// Return true if str starts with prefix
 extern bool starts_with(const char* str, const char* prefix);
 
-/// Get current working directory
+/// Get Current Working Directory
 extern std::string getcwd();
 
 /// Erase all seq occurrences in str

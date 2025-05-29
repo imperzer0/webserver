@@ -12,6 +12,7 @@
 
 # Project exclude paths
 /cmake-build-*/
+/.idea/
 
 /resources.hpp
 /webpages/

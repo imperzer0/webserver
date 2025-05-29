@@ -1,0 +1,6 @@
+[submodule "mongoose"]
+	path = mongoose
+	url = https://github.com/cesanta/mongoose.git
+[submodule "strscan"]
+	path = strscan
+	url = https://github.com/imperzer0/strscan.git

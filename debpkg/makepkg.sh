@@ -1,5 +1,4 @@
 #!/bin/bash
-
 pkgname="webserver"
 pkgver="2.11"
 makedepends=('cmake' 'git' 'gcc' 'make' 'openssl' 'curl' 'libcurl4-openssl-dev')
@@ -10,12 +9,15 @@ pkgdir="$(pwd)/$pkgname"
 srcdir="$(pwd)/src"
 
 
-mksrc() {
-  echo "-> mksrc($pkgname) in $(pwd)"
+init_dirs() {
+  echo "-> init_dirs($pkgname) in $(pwd)"
 
-  rm -rfv src && echo "Removed old source directory" || exit 1;
-  mkdir -pv src;
-  cd src || exit 1;
+  rm -rfv "$srcdir" && echo "Removed old source directory" || exit 1;
+  rm -rfv "$pkgdir" && echo "Removed old package directory" || exit 1;
+  mkdir -pv "$srcdir";
+  mkdir -pv "$pkgdir";
+
+  cd "$srcdir" || exit 1;
 }
 
 copy_files() {
@@ -33,23 +35,23 @@ copy_files() {
   file=()
   sha512sums=()
 
-  external=(${external[@]} "https://raw.githubusercontent.com/cesanta/mongoose/$mongoose_version/mongoose.c")
-  file=(${file[@]} "mongoose.c")
-  sha512sums=(${sha512sums[@]} "55011c1328abcfa91897b4b29aa5e1ab6c5f5f351442b8fc247ee9d9751dbbce1ab1892f9f996f140a18719a49412f45aad6c6bdbf7eed3348cb01982293daea")
+  external=(${external[*]} "https://raw.githubusercontent.com/cesanta/mongoose/$mongoose_version/mongoose.c")
+  file=(${file[*]} "mongoose.c")
+  sha512sums=(${sha512sums[*]} "55011c1328abcfa91897b4b29aa5e1ab6c5f5f351442b8fc247ee9d9751dbbce1ab1892f9f996f140a18719a49412f45aad6c6bdbf7eed3348cb01982293daea")
 
-  external=(${external[@]} "https://raw.githubusercontent.com/cesanta/mongoose/$mongoose_version/mongoose.h")
-  file=(${file[@]} "mongoose.h")
-  sha512sums=(${sha512sums[@]} "d13e87f326c285ce3aa7e837edb826d38f8bb73c72ac572af44f42447e9456f820f6d42e2248a33c18a3813b51f9e76ecfc99bba077d99a8f61d3b0b99b5cecd")
+  external=(${external[*]} "https://raw.githubusercontent.com/cesanta/mongoose/$mongoose_version/mongoose.h")
+  file=(${file[*]} "mongoose.h")
+  sha512sums=(${sha512sums[*]} "d13e87f326c285ce3aa7e837edb826d38f8bb73c72ac572af44f42447e9456f820f6d42e2248a33c18a3813b51f9e76ecfc99bba077d99a8f61d3b0b99b5cecd")
 
-  external=(${external[@]} "https://raw.githubusercontent.com/imperzer0/strscan/2f263154679e67ed44aa7fc4ae65829547e8290b/strscan.c")
-  file=(${file[@]} "strscan.c")
-  sha512sums=(${sha512sums[@]} "0f62f4fb922325e53713d7013b709d65d50a2c94a440258b666d357bf35af2f5727b2014fbf955e15f169acc8e444eca84b309419886bbc98d0b563c4b795bc6")
+  external=(${external[*]} "https://raw.githubusercontent.com/imperzer0/strscan/2f263154679e67ed44aa7fc4ae65829547e8290b/strscan.c")
+  file=(${file[*]} "strscan.c")
+  sha512sums=(${sha512sums[*]} "0f62f4fb922325e53713d7013b709d65d50a2c94a440258b666d357bf35af2f5727b2014fbf955e15f169acc8e444eca84b309419886bbc98d0b563c4b795bc6")
 
-  external=(${external[@]} "https://raw.githubusercontent.com/imperzer0/strscan/2f263154679e67ed44aa7fc4ae65829547e8290b/strscan.h")
-  file=(${file[@]} "strscan.h")
-  sha512sums=(${sha512sums[@]} "eb472a2ad6997f107d5f7db6f311294f34066f08fd6d7bf8c6be7f11322d8f26f50c678c6445c1f7643b32b3a28cfcd5576acc9b1af25ef33f41e3764165090d")
+  external=(${external[*]} "https://raw.githubusercontent.com/imperzer0/strscan/2f263154679e67ed44aa7fc4ae65829547e8290b/strscan.h")
+  file=(${file[*]} "strscan.h")
+  sha512sums=(${sha512sums[*]} "eb472a2ad6997f107d5f7db6f311294f34066f08fd6d7bf8c6be7f11322d8f26f50c678c6445c1f7643b32b3a28cfcd5576acc9b1af25ef33f41e3764165090d")
 
-  for i in ${!external[@]}; do
+  for i in ${!external[*]}; do
     _file="$srcdir/${file[i]}"
     curl -L ${external[i]} -o $_file;
     echo -n "Checking [$_file] sha512sum: "
@@ -59,13 +61,13 @@ copy_files() {
   source=()
   sha512sums=()
 
-  source=(${source[@]} "resources/favicon.ico")
-  sha512sums=(${sha512sums[@]} "72850225ffda45dff7f87645e80512ddce302fec175df7adb0e6d8d91f5f5a2131250fe91510b35f19cf05c1d229aa9eb8f71594c918555acb0418f3c2975cff")
+  source=(${source[*]} "resources/favicon.ico")
+  sha512sums=(${sha512sums[*]} "72850225ffda45dff7f87645e80512ddce302fec175df7adb0e6d8d91f5f5a2131250fe91510b35f19cf05c1d229aa9eb8f71594c918555acb0418f3c2975cff")
 
-  source=(${source[@]} "resources/CascadiaMono.woff")
-  sha512sums=(${sha512sums[@]} "180d3248b16d5d3ed3aca598eb67e7edb8ec8553c21edafe96d9d268989c0d7896a615c7e67527d1fca913308e1b24a363a59c7826b7e341012e853736db4fa6")
+  source=(${source[*]} "resources/CascadiaMono.woff")
+  sha512sums=(${sha512sums[*]} "180d3248b16d5d3ed3aca598eb67e7edb8ec8553c21edafe96d9d268989c0d7896a615c7e67527d1fca913308e1b24a363a59c7826b7e341012e853736db4fa6")
 
-  for i in ${!source[@]}; do
+  for i in ${!source[*]}; do
     echo -n "Checking sha512sum: ";
     echo "${sha512sums[i]} $srcdir/${source[i]}" | sha512sum --check || exit 2;
   done
@@ -91,8 +93,8 @@ prepare() {
 install_deps() {
   echo "-> install_deps($pkgname)"
 
-  sudo apt install ${makedepends[@]} || exit 10;
-  sudo apt-mark auto ${makedepends[@]};
+  sudo apt install -y ${makedepends[*]} || exit 10;
+  sudo apt-mark auto ${makedepends[*]};
 }
 
 build() {
@@ -111,20 +113,36 @@ package() {
   install -Dm755 "$srcdir/$pkgname" "${pkgdir:?}/usr/bin/$pkgname" || exit 6;
 }
 
+create_control_file() {
+  mkdir -p "$pkgdir/DEBIAN"
+  cat <<EOF > "$pkgdir/DEBIAN/control"
+Package: $pkgname
+Version: $pkgver
+Essential: no
+Priority: optional
+Maintainer: imperzer0 <dmytroperets@gmail.com>
+Architecture: $(dpkg --print-architecture)
+Depends: openssl, gcc, curl, libcurl4-openssl-dev, fineftp-server
+Description: Web server on c++
+Lightweight web server written in c++ for linux with ftp support
+EOF
+}
+
 dpkg_build() {
   echo "-> dpkg_build($pkgname) in $(pwd)"
 
   cd ..
-  dpkg-deb --build "./$pkgname" || exit 8;
+  dpkg-deb --verbose --build "./$pkgname" || exit 8;
 }
 
 
-mksrc;
+init_dirs;
 copy_files;
 prepare;
 install_deps;
 build;
 package;
+create_control_file;
 dpkg_build;
 
 

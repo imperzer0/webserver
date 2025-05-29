@@ -1,5 +1,5 @@
 #!/bin/bash
-# Maintained by imper <imperator999mcpe@gmail.com>
+# Maintained by imper <dmytroperets@gmail.com>
 
 pkgname=webserver
 pkgver=2.11
