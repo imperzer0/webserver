@@ -17,7 +17,9 @@
 #endif
 
 
-#define MG_STR_PRINT(str) (int)str.len, str.ptr
+#define _PRINT(mg_str) (int)mg_str.len, mg_str.buf
+#define _EXPAND(mg_str) mg_str.buf, (int)mg_str.len
+#define _MATCH_CSTR(str) mg_str(str), nullptr
 
 
 extern const char* http_address;
@@ -37,20 +39,16 @@ extern void server_initialize();
 extern void server_run();
 
 
-typedef void (* path_handler_function)(struct mg_connection* connection, struct mg_http_message* msg);
+typedef void (*path_handler_function)(struct mg_connection* connection, struct mg_http_message* msg);
 
 typedef struct
 {
-	std::string path;
-	std::string description;
-	path_handler_function fn;
-	enum : int { STRICT = 0, SOFT } restriction_type;
+    std::string path_regex;
+    std::string description;
+    path_handler_function fn;
 } registered_path_handler;
 
-extern void register_path_handler(
-		const std::string& path, const std::string& description, path_handler_function fn,
-		decltype(registered_path_handler::restriction_type) type
-);
+extern void register_path_handler(const std::string& path, const std::string& description, path_handler_function fn);
 
 extern const auto* get_registered_users();
 

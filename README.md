@@ -96,3 +96,14 @@ I recommend doing so in `config.cpp`.<br/>
 Follow the guidelines in the comments to configure it properly.<br/>
 I *don't recommend* touching any other files for it can make the app unstable<br/>
 if you don't completely understand what they do, but you can definitely try.<br/>
+
+
+# Potential vulnerabilities
+To protect your server from hackers:
+1. Create a user for the webserver and use native linux protections to prevent users
+   from accessing non-server files and directories
+2. Avoid allowing users to create symlinks. They can escape their sandbox root directory
+   and potentially get into other user's directory
+3. Make sure that other services that have access to this server's directories won't
+   execute or process in a way that could compromise the security of the machine
+   files that users can create and modify

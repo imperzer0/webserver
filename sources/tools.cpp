@@ -56,8 +56,8 @@ std::string erase_all(const std::string& str, const std::string& seq)
 
 std::string secure_path(const std::string& path)
 {
-	std::string res = erase_all(path, "../");
-	return erase_all(res, "/..");
+	std::string res = erase_all(path, "../"); // Erase ../
+	return erase_all(res, "/.."); // Erase /..
 }
 
 

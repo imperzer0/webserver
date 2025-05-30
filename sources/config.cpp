@@ -91,7 +91,7 @@ void register_additional_handlers()
 						connection, 200, "", RESOURCE(dashboard_html),
 						statistics.recent_uploads_count, appendix.c_str()
 				);
-			}, registered_path_handler::STRICT
+			}
 	);
 
 	add_custom_ftp_handler(
