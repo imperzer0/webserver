@@ -1,1 +1,1 @@
-../strscan.h
+../strscan/strscan.h

@@ -2,18 +2,14 @@
 /pkg/
 /*.pkg.tar.zst
 
-# mongoose lib
-/mongoose.c
-/mongoose.h
-
-# strscan lib
-/strscan.c
-/strscan.h
-
 # Project exclude paths
 /cmake-build-*/
+/.idea/
 
 /resources.hpp
 /webpages/
 
-/archpackage
+# All
+/debpackage/*
+# except
+!/debpackage/makepkg.sh

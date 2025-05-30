@@ -1,5 +1,5 @@
 // Copyright (c) 2022 Perets Dmytro
-// Author: Perets Dmytro <imperator999mcpe@gmail.com>
+// Author: Perets Dmytro <dmytroperets@gmail.com>
 //
 // Personal usage is allowed only if this comment was not changed or deleted.
 // Commercial usage must be approved by the author of this comment.
@@ -41,9 +41,10 @@ inline static void help()
 	::printf("   --hexdump         | H                Enable hex dump.\n");
 	::printf("   --version         | v                Show version information.\n");
 	::printf("   --help            | h                Show this help message.\n\n");
-	::printf("* Required options.\n");
-	::printf("** Required only while using '--https_address'.\n\n");
+	::printf("* Required.\n");
+	::printf("** Required only with '--https_address'.\n\n");
 	::printf("In order to generate ssl certificates in current folder run following bash commands:\n");
+	::printf("# This is an example - replace it with your information");
 	::printf("CASUBJ=\"/C=UA/ST=Ukraine/L=Zakarpattia/O=imperzer0/CN=CAwebserver\";\n");
 	::printf("CRTSUBJ=\"/C=UA/ST=Ukraine/L=Zakarpattia/O=imperzer0/CN=CRTwebserver\";\n");
 	::printf("# Generate CA (Certificate Authority)\n");

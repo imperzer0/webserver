@@ -1,5 +1,5 @@
 // Copyright (c) 2022 Perets Dmytro
-// Author: Perets Dmytro <imperator999mcpe@gmail.com>
+// Author: Perets Dmytro <dmytroperets@gmail.com>
 //
 // Personal usage is allowed only if this comment was not changed or deleted.
 // Commercial usage must be approved by the author of this comment.
@@ -56,8 +56,8 @@ std::string erase_all(const std::string& str, const std::string& seq)
 
 std::string secure_path(const std::string& path)
 {
-	std::string res = erase_all(path, "../");
-	return erase_all(res, "/..");
+	std::string res = erase_all(path, "../"); // Erase ../
+	return erase_all(res, "/.."); // Erase /..
 }
 
 

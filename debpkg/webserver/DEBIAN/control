@@ -1,8 +1,0 @@
-Package: webserver
-Essential: no
-Priority: optional
-Maintainer: imperzer0 <imperator999mcpe@gmail.com>
-Version: 2.10
-Architecture: amd64
-Depends: openssl, gcc, curl, libcurl4-openssl-dev, fineftp-server
-Description: Lightweight c++ web server for linux with ftp

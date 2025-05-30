@@ -1,5 +1,5 @@
 // Copyright (c) 2022 Perets Dmytro
-// Author: Perets Dmytro <imperator999mcpe@gmail.com>
+// Author: Perets Dmytro <dmytroperets@gmail.com>
 //
 // Personal usage is allowed only if this comment was not changed or deleted.
 // Commercial usage must be approved by the author of this comment.
@@ -91,7 +91,7 @@ void register_additional_handlers()
 						connection, 200, "", RESOURCE(dashboard_html),
 						statistics.recent_uploads_count, appendix.c_str()
 				);
-			}, registered_path_handler::STRICT
+			}
 	);
 
 	add_custom_ftp_handler(
