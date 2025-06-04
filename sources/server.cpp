@@ -254,6 +254,9 @@ void client_handler(struct mg_connection* connection, int ev, void* ev_data)
 /// Initialize server
 void server_initialize()
 {
+    // Create config directory - if does not exist
+    init_config_dir();
+
     // If the email has been defined, but the password is empty
     if (server_verification_email != nullptr && server_verification_email_password == nullptr)
     {
@@ -943,10 +946,15 @@ inline bool mkdir_p(const char* path)
     return mkdir(tmp, S_IRWXU) == 0;
 }
 
+inline void init_config_dir()
+{
+    mkdir_p(CONFIG_DIR);
+}
+
 
 inline static void load_users()
 {
-    FILE* file = ::fopen("/etc/webserver.users", "rb"); // Open users file
+    FILE* file = ::fopen(CONFIG_DIR "passwd", "rb"); // Open users file
     if (file)
     {
         while (!::feof(file))
@@ -964,7 +972,7 @@ inline static void load_users()
 
 inline static void save_users()
 {
-    FILE* file = ::fopen("/etc/webserver.users", "wb");
+    FILE* file = ::fopen(CONFIG_DIR "passwd", "wb");
     if (!file)
         return;
     for (auto& reg_user : registered_users)

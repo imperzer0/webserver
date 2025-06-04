@@ -30,5 +30,9 @@
 #  define MAX_INLINE_FILE_SIZE 16777216 // 16 MB
 # endif
 
+# ifndef CONFIG_DIR
+#  define CONFIG_DIR "/etc/webserver/" // 16 MB
+# endif
+
 
 #endif //WEBSERVER_CONSTANTS_HPP
