@@ -25,7 +25,7 @@ bash makepkg.sh -i
 #### Docker
 
 ```bash
-docker build --rm -t webserver .
+docker build -t webserver . && docker image prune -f && docker compose up
 ```
 
 ## Setup email
@@ -53,14 +53,15 @@ First you need to generate ssl certificates (only once)
 ```bash
 sudo mkdir -p /srv/certs/
 cd /srv/certs/
-echo -e "CASUBJ=\"/C=UA/ST=Ukraine/L=Zakarpattia/O=imperzer0/CN=CAwebserver\";\n\
-         CRTSUBJ=\"/C=UA/ST=Ukraine/L=Zakarpattia/O=imperzer0/CN=CRTwebserver\";\n\
+echo -e "CASUBJ=\"/C=UA/ST=Ukraine/L=Zakarpattia/O=dima/CN=CAwebserver\";\n\
+         CRTSUBJ=\"/C=UA/ST=Ukraine/L=Zakarpattia/O=dima/CN=CRTwebserver\";\n\
          # Generate CA (Certificate Authority)\n\
-         openssl genrsa -out ca.key 2048;\n\
+         openssl ecparam -genkey -name prime256v1 -out ca.key;\n\
          openssl req -new -x509 -days 365 -key ca.key -out ca.pem -subj \$CASUBJ;\n\
          # Generate server certificate\n\
-         openssl genrsa -out key.pem 2048;\n\
+         openssl ecparam -genkey -name prime256v1 -out key.pem;\n\
          openssl req -new -key key.pem -out csr.pem -subj \$CRTSUBJ;\n\
+         # Sign the public key\n\
          openssl x509 -req -days 365 -in csr.pem -CA ca.pem -CAkey ca.key -set_serial 01 -out cert.pem;" \
   >generator.bash && chmod +x generator.bash && bash generator.bash
 ```
@@ -91,15 +92,14 @@ docker run --network=host -v webserver_certificates:/srv/certs \
 ## Modification
 
 `webserver` is a flexible application.<br/>
-If you want to implement custom functionality,<br/>
-I recommend doing so in `config.cpp`.<br/>
+If you want to implement custom functionality - go to `config.cpp`.<br/>
 Follow the guidelines in the comments to configure it properly.<br/>
-I *don't recommend* touching any other files for it can make the app unstable<br/>
-if you don't completely understand what they do, but you can definitely try.<br/>
+Then you have to recompile and reinstall the application.
 
+# Security tips
 
-# Potential vulnerabilities
 To protect your server from hackers:
+
 1. Create a user for the webserver and use native linux protections to prevent users
    from accessing non-server files and directories
 2. Avoid allowing users to create symlinks. They can escape their sandbox root directory

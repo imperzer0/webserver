@@ -1,0 +1,20 @@
+services:
+  webserver:
+    container_name: webserver
+    image: webserver
+    build: .
+    ports:
+      - "1480:80"
+      - "1443:443"
+    volumes:
+      - webserver_data:/srv/webserver/
+      - webserver_conf:/etc/webserver/
+
+
+volumes:
+  webserver_data:
+    labels:
+      description: "Contains the root folder where the webserver operates (mostly user files)"
+  webserver_conf:
+    labels:
+      description: "Config in /etc"

@@ -4,74 +4,93 @@
 # Personal usage is allowed only if this comment was not changed or deleted.
 # Commercial usage must be approved by the author of this comment.
 
+### BUILD Container ###
+FROM debian:bookworm AS build
 
-FROM archlinux AS build
+# UPGRADE
+RUN [ "apt-get", "update", "--yes" ]
+RUN [ "apt-get", "upgrade", "--yes" ]
+# We need sudo for makepkg.sh
+RUN [ "apt-get", "install", "--yes", "sudo" ]
 
-RUN pacman -Sy base-devel --noconfirm --needed
+# And non-root user
+RUN [ "useradd", "-G", "sudo", "-s", "/bin/bash", "build" ]
+RUN echo '%sudo   ALL=(ALL:ALL) NOPASSWD:ALL' >> /etc/sudoers
 
-RUN useradd -mg users -G wheel -s /bin/bash webserver
-RUN echo '%wheel ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
+# Build directory /webserver/
+RUN [ "mkdir", "-p", "/webserver/" ]
+COPY . /webserver/
+RUN [ "chown", "-R", "build:build", "/webserver/" ]
 
-RUN mkdir -p /webserver/
-COPY * /webserver/
-RUN chown webserver:users -R /webserver/
+# Run packaging script
+WORKDIR /webserver/debpackage/
+USER build
+RUN [ "bash", "makepkg.sh" ]
+RUN ls -lh *.deb
+RUN ls -lh src/ftp/debpackage/*.deb
 
-WORKDIR /webserver/
-RUN ls -alshp
-USER webserver
-RUN makepkg -sif --noconfirm
 
-FROM archlinux
+### APP Container ###
+FROM debian:bookworm AS app
 
-RUN mkdir -p /pack/
-COPY --from=build /webserver/*.pkg.tar.zst /pack/
+# UPGRADE
+RUN [ "apt-get", "update", "--yes" ]
+RUN [ "apt-get", "upgrade", "--yes" ]
+
+# Non-root user
+RUN [ "useradd", "-mG", "users", "-s", "/bin/bash", "webserver" ]
+
+# Copy built packages from 'build' container
+RUN [ "mkdir", "-p", "/pack/ftp/" ]
+COPY --from=build /webserver/debpackage/src/ftp/debpackage/*.deb /pack/ftp/
+COPY --from=build /webserver/debpackage/*.deb /pack/
+
+# Install packages
 WORKDIR /pack/
-RUN pacman -Sy vim nano --noconfirm --needed
-RUN pacman -U *.pkg.tar.zst --noconfirm
+RUN dpkg --unpack ftp/*.deb
+RUN dpkg --unpack *.deb
+RUN [ "apt-get", "install", "--yes", "--fix-broken" ]
 
-RUN mkdir -p /srv/webserver/
-RUN mkdir -p /srv/certs/
+# Init Server root
+RUN [ "mkdir", "-p", "/srv/webserver/" ]
+RUN [ "chown", "-R", "webserver:webserver", "/srv/webserver/" ]
+RUN [ "chmod", "-R", "644", "/srv/webserver/" ]
+RUN [ "chmod", "744", "/srv/webserver/" ]
 
-EXPOSE 80 443 21
+#      http  https  ftp
+EXPOSE 80    443    21
 
+# Create Certificates in /srv/certs/
+RUN [ "mkdir", "-p", "/srv/certs/" ]
 WORKDIR /srv/certs/
-RUN /bin/bash -c "[[ \$([ ! -e /srv/certs/ca.key ]) || \
-                  \$([ ! -e /srv/certs/ca.pem ]) || \
-                  \$([ ! -e /srv/certs/cert.pem ]) || \
-                  \$([ ! -e /srv/certs/csr.pem ]) || \
-                  \$([ ! -e /srv/certs/key.pem ]) ]] && echo \"All files present\" && \
-                  echo -e \"CASUBJ=\"/C=UA/ST=Ukraine/L=Zakarpattia/O=imperzer0/CN=CAwebserver\";\n\
-                            CRTSUBJ=\"/C=UA/ST=Ukraine/L=Zakarpattia/O=imperzer0/CN=CRTwebserver\";\n\
+RUN [ "chmod", "-R", "700", "/srv/certs/" ]
+RUN /bin/bash -c "echo -e \"CASUBJ=\"/C=UA/ST=Ukraine/L=Zakarpattia/O=dima/CN=CAwebserver\";\n\
+                            CRTSUBJ=\"/C=UA/ST=Ukraine/L=Zakarpattia/O=dima/CN=CRTwebserver\";\n\
                             # Generate CA (Certificate Authority)\n\
-                            openssl genrsa -out ca.key 2048;\n\
+                            openssl ecparam -genkey -name prime256v1 -out ca.key;\n\
                             openssl req -new -x509 -days 365 -key ca.key -out ca.pem -subj \\\$CASUBJ;\n\
                             # Generate server certificate\n\
-                            openssl genrsa -out key.pem 2048;\n\
+                            openssl ecparam -genkey -name prime256v1 -out key.pem;\n\
                             openssl req -new -key key.pem -out csr.pem -subj \\\$CRTSUBJ;\n\
+                            # Sign the public key\n\
                             openssl x509 -req -days 365 -in csr.pem -CA ca.pem -CAkey ca.key -set_serial 01 -out cert.pem;\"\
-                  > generator.bash && chmod +x generator.bash && bash generator.bash || exit 0"
-RUN ls -alshp
+                  > generator.bash || exit 2;"
+RUN [ "chmod", "+x", "generator.bash" ]
+RUN [ "bash", "generator.bash" ]
+RUN chmod -R 600 /srv/certs/*
+RUN [ "chown", "-R", "webserver:webserver", "/srv/certs/" ]
+# Check
+RUN openssl x509 -in /srv/certs/cert.pem -text -noout && \
+    openssl pkey -in /srv/certs/key.pem -check -noout
 
+# Init Server config
+RUN [ "mkdir", "-p", "/etc/webserver/" ]
+RUN [ "chown", "-R", "webserver:webserver", "/etc/webserver/" ]
+RUN [ "chmod", "-R", "600", "/etc/webserver/" ]
+
+### RUN Configuration ###
+USER webserver
 WORKDIR /srv/webserver/
-RUN ls -alshp
 
-RUN ["/bin/bash", "-c", "echo -e 'cd /srv/webserver/;\n/bin/webserver $@;' > /script.bash; chmod +x /script.bash"]
-
-#RUN pacman -Sy openssh gdb rsync --noconfirm --needed
-#EXPOSE 2222
-#RUN /usr/bin/ssh-keygen -A
-#RUN echo -e "Port 2222\n\
-#          PermitRootLogin yes\n\
-#          PermitEmptyPasswords yes\n\
-#          AuthorizedKeysFile      .ssh/authorized_keys\n\
-#          KbdInteractiveAuthentication no\n\
-#          UsePAM yes\n\
-#          PrintMotd no\n\
-#          Subsystem       sftp    /usr/lib/ssh/sftp-server" > /etc/ssh/sshd_config
-#RUN echo -e "root:\$6\$MVBXiuW1Hhl3OeF9\$M01MasH4nnCwfypFNgIbniEKKe2yPi/hdqbggFd1.KkjYjqxP9Hr2J1i95Q1TSo4ySqewc62Xezi6LcBE3OEp.:19322:0:99999:7:::\n\
-#    webserver:\$6\$MVBXiuW1Hhl3OeF9\$M01MasH4nnCwfypFNgIbniEKKe2yPi/hdqbggFd1.KkjYjqxP9Hr2J1i95Q1TSo4ySqewc62Xezi6LcBE3OEp.:19322:0:99999:7:::" > /etc/shadow
-#RUN echo -e "root:\$6\$MVBXiuW1Hhl3OeF9\$M01MasH4nnCwfypFNgIbniEKKe2yPi/hdqbggFd1.KkjYjqxP9Hr2J1i95Q1TSo4ySqewc62Xezi6LcBE3OEp.:19322:0:99999:7:::\n\
-#    webserver:\$6\$MVBXiuW1Hhl3OeF9\$M01MasH4nnCwfypFNgIbniEKKe2yPi/hdqbggFd1.KkjYjqxP9Hr2J1i95Q1TSo4ySqewc62Xezi6LcBE3OEp.:19322:0:99999:7:::" > /etc/shadow-
-
-ENTRYPOINT ["/bin/bash", "/script.bash", "--tls", "/srv/certs/"]
-#ENTRYPOINT ["/bin/sshd", "-D"]
+ENTRYPOINT ["/bin/webserver", "--tls", "/srv/certs/"]
+CMD ["--loglevel", "4"]
