@@ -1,14 +1,63 @@
 #!/bin/bash
 pkgname="webserver"
 pkgver="2.11"
-makedepends=('cmake' 'git' 'gcc' 'make' 'openssl' 'curl' 'libcurl4-openssl-dev')
+makedepends=('build-essential' 'cmake' 'make' 'gcc' 'g++' 'openssl' 'libssl-dev' 'curl' 'libcurl4-openssl-dev')
 
 pkgdir="$(pwd)/$pkgname"
 srcdir="$(pwd)/src"
 
 
-init_dirs() {
-  echo "-> init_dirs($pkgname) in $(pwd)"
+# Default Parameters
+DEBUG_BUILD=0
+INSTALL=0
+JUSTLOAD=0
+
+# Parse CL Arguments
+__POSITIONAL_ARGS__=()
+
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    -d)
+      DEBUG_BUILD=1
+      shift # past argument
+      ;;
+    -i)
+      INSTALL=1
+      shift # past argument
+      ;;
+    -l)
+      JUSTLOAD=1
+      shift # past argument
+      ;;
+    -*)
+      echo "Unknown option $1"
+      echo ""
+      echo "Available options:"
+      echo "-d  : Build as Debug"
+      echo "-i  : Install right away"
+      echo "-l  : Just Load the functions without executing them"
+      exit 1
+      ;;
+    *)
+      __POSITIONAL_ARGS__+=("$1") # save positional arg
+      shift # past argument
+      ;;
+  esac
+done
+
+set -- "${__POSITIONAL_ARGS__[@]}" # restore positional parameters
+
+
+
+MAKEPKG_install_deps() {
+  echo "-> MAKEPKG_install_deps($pkgname)"
+
+  sudo apt-get install --yes ${makedepends[*]} || exit 10;
+  sudo apt-mark auto ${makedepends[*]};
+}
+
+MAKEPKG_init_dirs() {
+  echo "-> MAKEPKG_init_dirs($pkgname) in $(pwd)"
 
   rm -rfv "$srcdir" && echo "Removed old source directory" || exit 1;
   rm -rfv "$pkgdir" && echo "Removed old package directory" || exit 1;
@@ -18,9 +67,9 @@ init_dirs() {
   cd "$srcdir" || exit 1;
 }
 
-copy_files() {
+MAKEPKG_copy_files() {
   _srcprefix="../.."
-  echo "-> copy_files($pkgname:$_srcprefix->$srcdir) in $(pwd)"
+  echo "-> MAKEPKG_copy_files($pkgname:$_srcprefix->$srcdir) in $(pwd)"
 
   cp -rfv "$_srcprefix/CMakeLists.txt" "$srcdir/.";
 
@@ -47,8 +96,8 @@ copy_files() {
   done
 }
 
-prepare() {
-  echo "-> prepare($pkgname) in $(pwd)"
+MAKEPKG_prepare() {
+  echo "-> MAKEPKG_prepare($pkgname) in $(pwd)"
 
   _cwd="$(pwd)"
 
@@ -57,37 +106,35 @@ prepare() {
   echo " >> Executing makepkg.sh in [$(pwd)]..."
   bash "makepkg.sh" && echo "Success" || exit 3;
 
-  sudo dpkg -i "fineftp-server.deb";
+  sudo dpkg --unpack "fineftp-server.deb" || exit 3;
+  sudo apt-get install --yes --fix-broken || exit 3;
 
   sudo apt-mark auto fineftp-server
 
   cd "$_cwd" || exit 3;
 }
 
-install_deps() {
-  echo "-> install_deps($pkgname)"
+MAKEPKG_build() {
+  echo "-> MAKEPKG_build($pkgname\[v$pkgver]) in $(pwd)"
 
-  sudo apt install -y ${makedepends[*]} || exit 10;
-  sudo apt-mark auto ${makedepends[*]};
-}
-
-build() {
-  echo "-> build($pkgname[v$pkgver]) in $(pwd)"
-
-  _package_version=" ("$pkgver")"
-  cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++ \
+  _package_version=" ($pkgver)"
+  _BUILD_TYPE=Release
+  if [ $DEBUG_BUILD -eq 1 ]; then
+    _BUILD_TYPE=Debug
+  fi
+  cmake -DCMAKE_BUILD_TYPE="$_BUILD_TYPE" -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++ \
     -DPACKAGE_VERSION="$_package_version" -DAPPNAME="$pkgname" . || exit 4;
   make -j 8 || exit 5;
 }
 
-package() {
-  echo "-> package($pkgname) in $(pwd)"
+MAKEPKG_package() {
+  echo "-> MAKEPKG_package($pkgname) in $(pwd)"
 
   rm -rfv "${pkgdir:?}/usr/bin/$pkgname" || exit 6;
   install -Dm755 "$srcdir/$pkgname" "${pkgdir:?}/usr/bin/$pkgname" || exit 6;
 }
 
-create_control_file() {
+MAKEPKG_create_control_file() {
   mkdir -p "$pkgdir/DEBIAN"
   cat <<EOF > "$pkgdir/DEBIAN/control"
 Package: $pkgname
@@ -96,30 +143,32 @@ Essential: no
 Priority: optional
 Maintainer: imperzer0 <dmytroperets@gmail.com>
 Architecture: $(dpkg --print-architecture)
-Depends: openssl, gcc, curl, libcurl4-openssl-dev, fineftp-server
+Depends: gcc, g++, openssl, libssl-dev, curl, libcurl4-openssl-dev, fineftp-server
 Description: Lightweight web server written in c++ for linux with ftp support
 EOF
 }
 
-dpkg_build() {
-  echo "-> dpkg_build($pkgname) in $(pwd)"
+MAKEPKG_dpkg_build() {
+  echo "-> MAKEPKG_dpkg_build($pkgname) in $(pwd)"
 
   cd ..
   dpkg-deb --verbose --build "./$pkgname" || exit 8;
 }
 
 
-init_dirs;
-copy_files;
-prepare;
-install_deps;
-build;
-package;
-create_control_file;
-dpkg_build;
+if [ $JUSTLOAD -eq 0 ]; then
+  MAKEPKG_install_deps;
+  MAKEPKG_init_dirs;
+  MAKEPKG_copy_files;
+  MAKEPKG_prepare;
+  MAKEPKG_build;
+  MAKEPKG_package;
+  MAKEPKG_create_control_file;
+  MAKEPKG_dpkg_build;
+fi
 
 
-if [ $# -ge 1 ] && [ "$1" == "-i" ]; then
+if [ $INSTALL -eq 1 ]; then
   echo "[Finishing up] Installing package {./$pkgname.deb}..."
-  sudo dpkg -i "./$pkgname.deb"
+  sudo dpkg -i "./$pkgname.deb" || exit 200;
 fi
