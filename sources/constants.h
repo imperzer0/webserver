@@ -1,7 +1,7 @@
 /// Project-wide constants. Make changes with caution!
 
-#ifndef WEBSERVER_CONSTANTS_HPP
-#define WEBSERVER_CONSTANTS_HPP
+#ifndef WEBSERVER_CONSTANTS_H
+#define WEBSERVER_CONSTANTS_H
 
 
 # define _STR(s) #s
@@ -34,5 +34,4 @@
 #  define CONFIG_DIR "/etc/webserver/" // 16 MB
 # endif
 
-
-#endif //WEBSERVER_CONSTANTS_HPP
+#endif //WEBSERVER_CONSTANTS_H

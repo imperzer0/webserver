@@ -4,33 +4,31 @@
 // Personal usage is allowed only if this comment was not changed or deleted.
 // Commercial usage must be approved by the author of this comment.
 
+/// This file has functions that define the server
+/// Includes:
+///
 
+#include "constants.h"
+#include "config.h"
 #include "server.h"
 #include "../mongoose/mongoose.c"
-#include "constants.hpp"
 #include "../strscan/strscan.c"
 #include "../resources.hpp"
 #include "tools.h"
-#include "config.h"
+#include "users.h"
 
 
 #ifdef ENABLE_FILESYSTEM_ACCESS
-
-#include "../ftp/ftp_event_handler.h"
-#include <fineftp/server.h>
-
-
+# include <fineftp/server.h>
 #endif
 
 
-#include <map>
 #include <ftw.h>
 #include <regex>
 #include <curl/curl.h>
 
 
-typedef id_t uint32_t;
-
+//// Default Values for CLI Parameters ////
 const char* http_address = DEFAULT_HTTP_SERVER_ADDRESS;
 const char* https_address = DEFAULT_HTTPS_SERVER_ADDRESS;
 const char* tls_path = nullptr;
@@ -38,25 +36,21 @@ const char* server_verification_email = nullptr;
 const char* server_verification_email_password = nullptr;
 const char* server_verification_smtp_server = "smtps://smtp.gmail.com:465";
 int log_level = 2, hexdump = 0;
+//// ////
 
 #ifdef ENABLE_FILESYSTEM_ACCESS
 pthread_mutex_t ftp_callback_mutex = PTHREAD_MUTEX_INITIALIZER;
 #endif
 
+// Server Connection Manager
 static struct mg_mgr manager{};
+// The connection itself
 static struct mg_connection *http_server_connection = nullptr, *https_server_connection = nullptr;
 
 #ifdef ENABLE_FILESYSTEM_ACCESS
+// FTP Server Instance
 static fineftp::FtpServer ftp_server;
 #endif
-
-// Users: login, email, password
-static std::map<std::string, std::pair<std::string, std::string>> registered_users;
-// Users who just created their account and need to verify their email address
-static std::map<id_t, std::pair<std::string, std::pair<std::string, std::string>>> registered_users_pending;
-
-static std::regex regex_login("^[a-zA-Z0-9_]*$");
-static std::regex regex_email(R"(^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$)");
 
 // Handle interrupts, like Ctrl-C
 static int s_signo = 0;
@@ -65,44 +59,24 @@ static int s_signo = 0;
 static void signal_handle_print_details(int signo)
 {
     MG_ERROR(("[SIGNAL_HANDLER] Handling SIG%s(%d) \"%s\"...", sigabbrev_np(signo), signo, sigdescr_np(signo)));
-    // TODO: For better compatibility: Rollback to the previous signal handler, not the default one
-    signal(signo, SIG_DFL);
+    signal(signo, SIG_DFL); // Continue as default
     s_signo = signo;
 }
 
 
 /// A linked list of path handlers
-typedef struct __registered_path_handlers
+typedef struct registered_path_handlers
 {
     registered_path_handler* data = nullptr;
-    struct __registered_path_handlers* next = nullptr;
+    struct registered_path_handlers* next = nullptr;
 } registered_path_handlers;
 
 static registered_path_handlers* handlers_start = nullptr;
 static registered_path_handlers* handlers_head = nullptr;
 
 
-/// rm -rf
-inline bool rm_rf(const std::string& path);
-
-/// mkdir -p
-inline bool mkdir_p(const std::string& path);
-
-/// Load registered users from the users file
-inline static void load_users();
-
-/// Save registered users into the users file
-inline static void save_users();
-
-#ifdef ENABLE_FILESYSTEM_ACCESS
-
-/// Create already registered users on ftp server (only for current session)
-inline static void forward_all_users();
-
-/// Create registered user on ftp server (only for current session)
-inline static void add_user(decltype(*registered_users.begin())& reg_user);
-
-#endif
+/// Create /etc/webserver directory if does not exist
+inline void init_config_dir();
 
 
 /// Send icon resource string as regular file over http
@@ -139,12 +113,6 @@ inline void handle_verify_html(struct mg_connection* connection, struct mg_http_
 
 /// Handle other resources request
 inline void handle_resources_html(struct mg_connection* connection, struct mg_http_message* msg);
-
-/// Get a map of registered users
-extern const auto* get_registered_users()
-{
-    return &registered_users;
-}
 
 /// Add path handler to global linked list
 void register_path_handler(const std::string& path, const std::string& description, path_handler_function fn)
@@ -251,6 +219,12 @@ void client_handler(struct mg_connection* connection, int ev, void* ev_data)
     }
 }
 
+
+inline void init_config_dir()
+{
+    mkdir_p(CONFIG_DIR);
+}
+
 /// Initialize server
 void server_initialize()
 {
@@ -295,7 +269,7 @@ void server_initialize()
 #ifdef ENABLE_FILESYSTEM_ACCESS
     if (log_level >= MG_LL_INFO)
     {
-        // Print all ftp commends executed on the server
+        // Print all ftp commands in logs
         add_custom_ftp_handler(
             [](
             const std::string& ftp_command, const std::string& parameters, const std::string& ftp_working_directory,
@@ -322,7 +296,7 @@ void server_initialize()
 
 #ifdef ENABLE_FILESYSTEM_ACCESS
     MG_INFO(("[FTP] Forwarding users to ftp server..."));
-    forward_all_users();
+    forward_users(ftp_server);
 #endif
 }
 
@@ -373,6 +347,7 @@ void server_run()
         MG_INFO(("Mongoose v" MG_VERSION));
         MG_INFO(("Server is listening on : [%s]", https_address));
         MG_INFO(("Web root directory  : [file://%s/]", cwd.c_str()));
+        MG_INFO(("Certificates directory  : [file://%s/]", tls_path));
         MG_INFO((""));
     }
 
@@ -577,7 +552,7 @@ inline void handle_dir_html(struct mg_connection* connection, struct mg_http_mes
     if (st.st_size > MAX_INLINE_FILE_SIZE)
     {
         extra_header = "Content-Disposition: attachment; filename=\"";
-        extra_header += path_basename(sdpath.c_str());
+        extra_header += path_basename(sdpath);
         extra_header += "\"\r\n";
 
         opts.extra_headers = extra_header.c_str();
@@ -674,8 +649,8 @@ inline id_t generate_id_and_send_email(struct mg_connection* connection, struct 
     srandom(mg_millis());
 
     id_t id = random();
-    for (int i = 0; id == 0 || registered_users_pending.contains(id) && i < 10; ++i) id = random();
-    if (registered_users_pending.contains(id))
+    for (int i = 0; id == 0 || pending_id_exists(id) && i < 10; ++i) id = random();
+    if (pending_id_exists(id))
         return 0;
 
     // Set up the curl handle
@@ -766,14 +741,14 @@ inline void handle_register_html(struct mg_connection* connection, struct mg_htt
         return;
     }
 
-    if (registered_users.contains(login))
+    if (get_registered_users()->contains(login))
     {
         send_error_html(connection, COLORED_ERROR(409), "User already exists");
         MG_INFO(("Blocked attempt to create an existing user - '%s'.", login));
         return;
     }
 
-    if (!std::regex_match(login, regex_login) || !std::regex_match(email, regex_email))
+    if (!std::regex_match(login, std::regex(REGEX_LOGIN)) || !std::regex_match(email, std::regex(REGEX_EMAIL)))
     {
         send_error_html(connection, COLORED_ERROR(406), "Wrong login or email format");
         MG_INFO(("Blocked attempt to create a user - '%s' / '%s' / '%s'.", login, email, password));
@@ -789,16 +764,14 @@ inline void handle_register_html(struct mg_connection* connection, struct mg_htt
 
     if (server_verification_email == nullptr)
     {
-        auto user = registered_users.insert({login, {email, password}});
-        if (!user.second)
+        __user_map_t::value_type user{login, {email, password}};
+        if (!add_new_user(user))
         {
             send_error_html(connection, COLORED_ERROR(500), "Could not insert user");
             return;
         }
-
-        save_users();
 #ifdef ENABLE_FILESYSTEM_ACCESS
-        add_user(*user.first);
+        add_user(ftp_server, user);
 #endif
         mg_http_reply(connection, 200, "", "Success");
     }
@@ -807,7 +780,7 @@ inline void handle_register_html(struct mg_connection* connection, struct mg_htt
         id_t id = generate_id_and_send_email(connection, msg, email);
         if (id == 0) return;
 
-        registered_users_pending[id] = {login, {email, password}};
+        add_pending_user(id, {login, {email, password}});
         send_verification_notification_page_html(connection);
     }
 }
@@ -853,24 +826,18 @@ inline void handle_verify_html(struct mg_connection* connection, struct mg_http_
         return;
     }
 
-    auto pending_user = registered_users_pending.find(id);
-    if (pending_user == registered_users_pending.end())
+    auto pending_user = find_pending_user(id);
+    if (pending_user == pending_user_invalid())
     {
         send_error_html(connection, COLORED_ERROR(403), "Invalid link");
         return;
     }
 
-    auto user = registered_users.insert(pending_user->second);
-    if (!user.second)
-    {
-        send_error_html(connection, COLORED_ERROR(500), "Could not insert user");
-        return;
-    }
-
-    save_users();
+    add_new_user(pending_user->second);
 #ifdef ENABLE_FILESYSTEM_ACCESS
-    add_user(*user.first);
+    add_user(ftp_server, pending_user->second);
 #endif
+
     mg_http_reply(connection, 200, "", "Success");
 }
 
@@ -900,122 +867,6 @@ inline void handle_resources_html(struct mg_connection* connection, struct mg_ht
     else
         send_error_html(connection, COLORED_ERROR(501), "This resource does not exist");
 }
-
-
-int unlink_cb(const char* fpath, const struct stat*, int, struct FTW*)
-{
-    int rv = remove(fpath);
-    if (rv) perror(fpath);
-    return rv;
-}
-
-inline bool rm_rf(const char* path)
-{
-    struct stat st{};
-    if (stat(path, &st) < 0)
-        return true;
-    return nftw(path, unlink_cb, 64, FTW_DEPTH | FTW_PHYS) == 0;
-}
-
-
-inline bool mkdir_p(const char* path)
-{
-    struct stat st{};
-    if (stat(path, &st) == 0)
-    {
-        if (S_ISDIR(st.st_mode))
-            return true;
-        rm_rf(path);
-    }
-
-    char tmp[256]{};
-    char* p = nullptr;
-    size_t len;
-
-    snprintf(tmp, sizeof(tmp), "%s", path);
-    len = strlen(tmp);
-    if (tmp[len - 1] == '/')
-        tmp[len - 1] = 0;
-    for (p = tmp + 1; *p; p++)
-        if (*p == '/')
-        {
-            *p = 0;
-            mkdir(tmp, S_IRWXU);
-            *p = '/';
-        }
-    return mkdir(tmp, S_IRWXU) == 0;
-}
-
-inline void init_config_dir()
-{
-    mkdir_p(CONFIG_DIR);
-}
-
-
-inline static void load_users()
-{
-    FILE* file = ::fopen(CONFIG_DIR "passwd", "rb"); // Open users file
-    if (file)
-    {
-        while (!::feof(file))
-        {
-            char username[HOST_NAME_MAX + 1]{};
-            char email[HOST_NAME_MAX + 1]{};
-            char password[HOST_NAME_MAX + 1]{};
-            if (::fscanf(file, "%s : %s : %s\n", username, email, password) == 3) // Scan line in format "<user> : <email> : <password>\n"
-                registered_users[username] = {email, password}; // Store user's credentials in RAM
-        }
-        ::fclose(file);
-    }
-}
-
-
-inline static void save_users()
-{
-    FILE* file = ::fopen(CONFIG_DIR "passwd", "wb");
-    if (!file)
-        return;
-    for (auto& reg_user : registered_users)
-        ::fprintf(
-            file, "%s : %s : %s\n",
-            reg_user.first.c_str(), reg_user.second.first.c_str(), reg_user.second.second.c_str()
-        );
-    ::fclose(file);
-}
-
-
-#ifdef ENABLE_FILESYSTEM_ACCESS
-
-inline static void forward_all_users()
-{
-    std::string cwd(getcwd());
-    cwd += '/';
-
-    for (const auto& reg_user : registered_users)
-    {
-        std::string root_dir = cwd + reg_user.first;
-        if (mkdir_p(root_dir.c_str()))
-        {
-            MG_INFO(("[FTP] Adding user \"%s\" to ftp server...", reg_user.first.c_str()));
-            ftp_server.addUser(reg_user.first, reg_user.second.second, root_dir, fineftp::Permission::All);
-        }
-    }
-}
-
-
-inline static void add_user(decltype(*registered_users.begin())& reg_user)
-{
-    std::string cwd(getcwd());
-    std::string root_dir = cwd + '/' + reg_user.first;
-    if (mkdir_p(root_dir.c_str()))
-    {
-        MG_INFO(("[FTP] Adding user \"%s\" to ftp server...", reg_user.first.c_str()));
-        ftp_server.addUser(reg_user.first, reg_user.second.second, root_dir, fineftp::Permission::All);
-    }
-}
-
-#endif
-
 
 inline void http_send_resource(struct mg_connection* connection, struct mg_http_message* msg, const char* rcdata, size_t rcsize,
                                const char* mime_type)
@@ -1082,8 +933,8 @@ inline void http_send_resource(struct mg_connection* connection, struct mg_http_
 
             // Read to send IO buffer directly, avoid extra on-stack buffer
             size_t max = MG_IO_SIZE, space;
-            size_t* cl = (size_t*)&c->data[(sizeof(c->data) - sizeof(size_t)) /
-                sizeof(size_t) * sizeof(size_t)];
+            auto* cl = reinterpret_cast<size_t*>(&c->data[(sizeof(c->data) - sizeof(size_t)) /
+                sizeof(size_t) * sizeof(size_t)]);
             if (c->send.size < max)
                 mg_iobuf_resize(&c->send, max);
             if (c->send.len >= c->send.size)
@@ -1112,10 +963,10 @@ inline void http_send_resource(struct mg_connection* connection, struct mg_http_
         }
     };
     // Track to-be-sent content length at the end of connection->data, aligned
-    size_t* clp = (size_t*)&connection->data[(sizeof(connection->data) - sizeof(size_t)) /
-        sizeof(size_t) * sizeof(size_t)];
+    auto clp = reinterpret_cast<size_t*>(&connection->data[(sizeof(connection->data) - sizeof(size_t)) /
+        sizeof(size_t) * sizeof(size_t)]);
     connection->pfn_data = new str_buf_fd{.data = rcdata, .len = rcsize, .pos = 0};
-    *clp = (size_t)cl; // Track to-be-sent content length
+    *clp = cl; // Track to-be-sent content length
 }
 
 

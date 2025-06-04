@@ -10,7 +10,7 @@
 #include "server.h"
 #include "config.h"
 #include "../resources.hpp"
-#include "constants.hpp"
+#include "constants.h"
 #include "tools.h"
 
 #ifdef ENABLE_FILESYSTEM_ACCESS

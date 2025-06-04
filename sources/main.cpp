@@ -4,8 +4,8 @@
 // Personal usage is allowed only if this comment was not changed or deleted.
 // Commercial usage must be approved by the author of this comment.
 
+#include "constants.h"
 #include "server.h"
-#include "constants.hpp"
 #include <getopt.h>
 
 
@@ -25,7 +25,7 @@ static constexpr struct option long_args[] = {
 };
 
 
-inline static void help()
+static void help()
 {
 	::printf(APPNAME " v" VERSION "\n");
 	::printf("Usage: " APPNAME " [OPTIONS]...\n");
@@ -43,10 +43,10 @@ inline static void help()
 	::printf("   --help            | h                Show this help message.\n\n");
 	::printf("* Required.\n");
 	::printf("** Required only with '--https_address'.\n\n");
-	::printf("In order to generate ssl certificates in current folder run following bash commands:\n");
-	::printf("# This is an example - replace it with your information");
+	::printf("In order to generate ssl certificates in current folder run following bash commands:\n\n");
 	::printf("CASUBJ=\"/C=UA/ST=Ukraine/L=Zakarpattia/O=imperzer0/CN=CAwebserver\";\n");
 	::printf("CRTSUBJ=\"/C=UA/ST=Ukraine/L=Zakarpattia/O=imperzer0/CN=CRTwebserver\";\n");
+	::printf("##  This is just an example. You can and should change the values above\n");
 	::printf("# Generate CA (Certificate Authority)\n");
 	::printf("openssl genrsa -out ca.key 2048;\n");
 	::printf("openssl req -new -x509 -days 365 -key ca.key -out ca.pem -subj $CASUBJ;\n");

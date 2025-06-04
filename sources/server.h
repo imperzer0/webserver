@@ -9,11 +9,10 @@
 #define WEBSERVER_SERVER_H
 
 #include <string>
-#include <map>
 #include "../mongoose/mongoose.h"
 
 #ifdef ENABLE_FILESYSTEM_ACCESS
-#include "../ftp/ftp_event_handler.h"
+# include "../ftp/ftp_event_handler.h"
 #endif
 
 
@@ -35,7 +34,6 @@ extern pthread_mutex_t ftp_callback_mutex;
 #endif
 
 extern void server_initialize();
-
 extern void server_run();
 
 
@@ -49,7 +47,5 @@ typedef struct
 } registered_path_handler;
 
 extern void register_path_handler(const std::string& path, const std::string& description, path_handler_function fn);
-
-extern const auto* get_registered_users();
 
 #endif //WEBSERVER_SERVER_H

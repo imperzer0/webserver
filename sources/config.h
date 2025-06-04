@@ -49,4 +49,12 @@ extern void register_additional_handlers();
 #  define MAX_RECENT_UPLOAD_RECORDS_COUNT 20 // Used in the custom handlers demo
 # endif
 
+# ifndef REGEX_LOGIN
+#  define REGEX_LOGIN "^[a-zA-Z0-9_]*$" // Allowed Login format (REGEX)
+# endif
+
+# ifndef REGEX_EMAIL
+#  define REGEX_EMAIL R"(^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$)" // Allowed Email format (REGEX)
+# endif
+
 #endif //WEBSERVER_CONFIG_H
