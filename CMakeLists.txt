@@ -3,6 +3,8 @@ project(webserver CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 
+find_package(OpenSSL REQUIRED)
+
 if (DEFINED PACKAGE_VERSION)
     add_compile_definitions(VERSION="${PACKAGE_VERSION}")
 endif ()
@@ -12,6 +14,7 @@ if (DEFINED APPNAME)
 endif ()
 
 add_compile_definitions(MG_ENABLE_OPENSSL=1)
+add_compile_definitions(MG_TLS=MG_TLS_OPENSSL)
 
 if ("${CMAKE_BUILD_TYPE}" STREQUAL "Release")
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Ofast")
@@ -74,7 +77,9 @@ set(CMAKE_VERBOSE_MAKEFILE on)
 add_executable(webserver
         sources/main.cpp
         sources/server.cpp
-        sources/config.cpp
-        sources/tools.cpp)
+        sources/settings.cpp
+        sources/tools.cpp
+        sources/users.cpp
+        sources/users.h)
 
-target_link_libraries(webserver pthread ssl crypto fineftp-server curl)
+target_link_libraries(webserver pthread OpenSSL::SSL OpenSSL::Crypto fineftp-server curl)

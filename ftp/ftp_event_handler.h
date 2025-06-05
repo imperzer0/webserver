@@ -1,9 +1,5 @@
 // Copyright (c) 2022 Perets Dmytro
 // Author: Perets Dmytro <dmytroperets@gmail.com>
-//
-// Personal usage is allowed only if this comment was not changed or deleted.
-// Commercial usage must be approved by the author of this comment.
-
 
 #ifndef FINEFTP_SERVER_FTP_EVENT_HANDLER_H
 #define FINEFTP_SERVER_FTP_EVENT_HANDLER_H

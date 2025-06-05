@@ -1,16 +1,11 @@
 // Copyright (c) 2022 Perets Dmytro
 // Author: Perets Dmytro <dmytroperets@gmail.com>
-//
-// Personal usage is allowed only if this comment was not changed or deleted.
-// Commercial usage must be approved by the author of this comment.
-
 
 #include <list>
 #include <filesystem>
 #include "server.h"
-#include "config.h"
+#include "settings.h"
 #include "../resources.hpp"
-#include "constants.hpp"
 #include "tools.h"
 
 #ifdef ENABLE_FILESYSTEM_ACCESS

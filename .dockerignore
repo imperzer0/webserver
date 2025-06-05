@@ -1,0 +1,14 @@
+**/.git/
+**/.idea/
+**/archpackage/
+**/cmake-build-*/
+**/.gitignore
+**/.gitmodules
+**/Dockerfile
+
+# Mongoose
+/mongoose/.github/
+/mongoose/src/
+/mongoose/test/
+/mongoose/tutorials
+/mongoose/.clang-format
