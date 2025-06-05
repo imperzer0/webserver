@@ -1,6 +1,4 @@
-//
-// Created by dima on 04 Jun 2025.
-//
+/// Most methods related to user account management
 
 #include "users.h"
 
@@ -101,6 +99,7 @@ void add_user(fineftp::FtpServer& ftp_server, const __user_map_t::value_type& re
 }
 
 #endif
+
 
 bool pending_id_exists(id_t id)
 {

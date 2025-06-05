@@ -1,8 +1,5 @@
 # Copyright (c) 2022 Perets Dmytro
 # Author: Perets Dmytro <dmytroperets@gmail.com>
-#
-# Personal usage is allowed only if this comment was not changed or deleted.
-# Commercial usage must be approved by the author of this comment.
 
 ### BUILD Container ###
 FROM debian:bookworm AS build
@@ -93,4 +90,4 @@ USER webserver
 WORKDIR /srv/webserver/
 
 ENTRYPOINT ["/bin/webserver", "--tls", "/srv/certs/"]
-CMD ["--loglevel", "4"]
+CMD []

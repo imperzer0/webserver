@@ -1,11 +1,9 @@
-//
-// Created by dima on 04 Jun 2025.
-//
+/// Most methods related to user account management
 
 #ifndef USERS_H
 #define USERS_H
 
-#include "config.h"
+#include "settings.h"
 #include <map>
 #include <fineftp/server.h>
 

@@ -1,17 +1,21 @@
 // Copyright (c) 2022 Perets Dmytro
 // Author: Perets Dmytro <dmytroperets@gmail.com>
-//
-// Personal usage is allowed only if this comment was not changed or deleted.
-// Commercial usage must be approved by the author of this comment.
 
+/// Configurations and settings that generally don't break the project.
+/// Therefore, they are called settings
 
-#ifndef WEBSERVER_CONFIG_H
-#define WEBSERVER_CONFIG_H
+#ifndef WEBSERVER_SETTINGS_H
+#define WEBSERVER_SETTINGS_H
 
 #include <set>
+#include <string>
 
-/* Uncomment this macro to enable ftp server and access to the filesystem on the server */
+
+/* Un/Comment this macro to Enable/Disable ftp server and access to the filesystem on the server */
 #define ENABLE_FILESYSTEM_ACCESS
+
+/* Display time in a human-readable way,   not just as %ul */
+#define MG_HTTP_DIRLIST_TIME_FMT
 
 
 #define COLOR_400 "rgba(147, 0, 0, 0.90)"
@@ -57,4 +61,4 @@ extern void register_additional_handlers();
 #  define REGEX_EMAIL R"(^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$)" // Allowed Email format (REGEX)
 # endif
 
-#endif //WEBSERVER_CONFIG_H
+#endif //WEBSERVER_SETTINGS_H

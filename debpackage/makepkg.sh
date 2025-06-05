@@ -1,6 +1,6 @@
 #!/bin/bash
 pkgname="webserver"
-pkgver="2.11"
+pkgver="3.0"
 makedepends=('build-essential' 'cmake' 'make' 'gcc' 'g++' 'openssl' 'libssl-dev' 'curl' 'libcurl4-openssl-dev')
 
 pkgdir="$(pwd)/$pkgname"

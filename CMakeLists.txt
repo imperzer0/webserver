@@ -77,7 +77,7 @@ set(CMAKE_VERBOSE_MAKEFILE on)
 add_executable(webserver
         sources/main.cpp
         sources/server.cpp
-        sources/config.cpp
+        sources/settings.cpp
         sources/tools.cpp
         sources/users.cpp
         sources/users.h)

@@ -1,12 +1,7 @@
 // Copyright (c) 2022 Perets Dmytro
 // Author: Perets Dmytro <dmytroperets@gmail.com>
-//
-// Personal usage is allowed only if this comment was not changed or deleted.
-// Commercial usage must be approved by the author of this comment.
 
 /// This file has functions that define the server
-/// Includes:
-///
 
 #include "constants.h"
 #include "config.h"
