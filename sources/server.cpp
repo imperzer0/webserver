@@ -202,11 +202,11 @@ void client_handler(struct mg_connection* connection, int ev, void* ev_data)
 
         MG_DEBUG(("Reading [%.*s]...", cert_path.size(), cert_path.c_str()));
         std::string Cert_ = FILE_read_all(cert_path);
-        MG_DEBUG(("Read: { %.*s }", 15, Cert_.c_str()));
+        MG_DEBUG(("Read: { %.*s... }", 25, Cert_.c_str()));
 
         MG_DEBUG(("Reading [%.*s]...", key_path.size(), key_path.c_str()));
         std::string Key_ = FILE_read_all(key_path);
-        MG_DEBUG(("Read: { %.*s }", 15, Key_.c_str()));
+        MG_DEBUG(("Read: { %.*s... }", 15, Key_.c_str()));
 
         // Make a structure to pass to mongoose
         struct mg_tls_opts opts = {
@@ -620,6 +620,7 @@ static size_t curl_read_callback_email_data(void* buffer, size_t size, size_t nm
 inline id_t generate_id_and_send_email(struct mg_connection* connection, struct mg_http_message* msg,
                                        const std::string& email)
 {
+    MG_DEBUG(("[Send Email] Checking user email..."));
     auto email_hostaddr_pos = email.find('@');
     if (email_hostaddr_pos == std::string::npos)
         return 0;
@@ -627,6 +628,7 @@ inline id_t generate_id_and_send_email(struct mg_connection* connection, struct 
     if (!server_verification_email_hosts_whitelist.empty() &&
         !server_verification_email_hosts_whitelist.contains(email.substr(email_hostaddr_pos + 1)))
     {
+        MG_DEBUG(("[Send Email] Host Not Allowed: %s", email.c_str()[email_hostaddr_pos + 1]));
         send_error_html(connection, COLORED_ERROR(406), "This email service provider is not allowed");
         return 0;
     }
@@ -634,6 +636,7 @@ inline id_t generate_id_and_send_email(struct mg_connection* connection, struct 
     if (!server_verification_email_hosts_blacklist.empty() &&
         server_verification_email_hosts_blacklist.contains(email.substr(email_hostaddr_pos + 1)))
     {
+        MG_DEBUG(("[Send Email] Banned Host: %s", email.c_str()[email_hostaddr_pos + 1]));
         send_error_html(connection, COLORED_ERROR(406), "This email service provider is not allowed");
         return 0;
     }
@@ -642,9 +645,13 @@ inline id_t generate_id_and_send_email(struct mg_connection* connection, struct 
 
     if (server_address == nullptr)
     {
+        MG_DEBUG(("[Send Email] Can't obtain Host address from header: 'Host'"));
         send_error_html(connection, COLORED_ERROR(500), "Can't generate a verification link");
         return 0;
     }
+
+
+    MG_DEBUG(("[Send Email] Generating ID..."));
 
     std::string server_address_str(server_address->buf, server_address->len);
 
@@ -699,14 +706,18 @@ inline id_t generate_id_and_send_email(struct mg_connection* connection, struct 
     // Send the email
     CURLcode res = curl_easy_perform(curl);
 
-    // Check for errors
-    if (res != CURLE_OK)
-        MG_ERROR(("[Send Email] curl_easy_perform() failed: %s\n", curl_easy_strerror(res)));
-
     // Clean up
     curl_slist_free_all(recipients);
     curl_easy_cleanup(curl);
     curl_global_cleanup();
+
+    // Check for errors
+    if (res != CURLE_OK)
+    {
+        MG_ERROR(("[Send Email] curl_easy_perform() failed: %s\n", curl_easy_strerror(res)));
+        send_error_html(connection, COLORED_ERROR(500), "Can't generate a verification link");
+        return 0;
+    }
 
     return id;
 }
@@ -727,18 +738,21 @@ inline void handle_register_html(struct mg_connection* connection, struct mg_htt
 
     if (login[0] == 0)
     {
+        MG_DEBUG(("Login.size = 0"));
         send_error_html(connection, COLORED_ERROR(406), "Login is required");
         return;
     }
 
     if (email[0] == 0)
     {
+        MG_DEBUG(("Email.size = 0"));
         send_error_html(connection, COLORED_ERROR(406), "Email is required");
         return;
     }
 
     if (password[0] == 0 || strlen(password) < 8)
     {
+        MG_DEBUG(("Password.size = 0"));
         send_error_html(connection, COLORED_ERROR(406), "Password is required and must be at least 8 characters long");
         return;
     }
@@ -746,26 +760,27 @@ inline void handle_register_html(struct mg_connection* connection, struct mg_htt
     if (get_registered_users()->contains(login))
     {
         send_error_html(connection, COLORED_ERROR(409), "User already exists");
-        MG_INFO(("Blocked attempt to create an existing user - '%s'.", login));
+        MG_INFO(("Blocked an attempt to create existing user - '%s'.", login));
         return;
     }
 
     if (!std::regex_match(login, std::regex(REGEX_LOGIN)) || !std::regex_match(email, std::regex(REGEX_EMAIL)))
     {
         send_error_html(connection, COLORED_ERROR(406), "Wrong login or email format");
-        MG_INFO(("Blocked attempt to create a user - '%s' / '%s' / '%s'.", login, email, password));
+        MG_INFO(("Blocked an attempt to create user - '%s' / '%s' / '%s'.", login, email, password));
         return;
     }
 
     if (std::string(password).find(' ') != std::string::npos)
     {
         send_error_html(connection, COLORED_ERROR(406), "The password should not contain whitespaces");
-        MG_INFO(("Blocked attempt to create a user - '%s' / '%s' / '%s'.", login, email, password));
+        MG_INFO(("Blocked an attempt to create user - '%s' / '%s' / '%s'.", login, email, password));
         return;
     }
 
     if (server_verification_email == nullptr)
     {
+        MG_DEBUG(("Verification Email --- Enabled"));
         __user_map_t::value_type user{login, {email, password}};
         if (!add_new_user(user))
         {
@@ -775,10 +790,11 @@ inline void handle_register_html(struct mg_connection* connection, struct mg_htt
 #ifdef ENABLE_FILESYSTEM_ACCESS
         add_user(ftp_server, user);
 #endif
-        mg_http_reply(connection, 200, "", "Success");
+        mg_http_reply(connection, 200, "", "Success"); // TODO: Successful Creation Page
     }
     else
     {
+        MG_DEBUG(("Verification Email --- Disabled"));
         id_t id = generate_id_and_send_email(connection, msg, email);
         if (id == 0) return;
 

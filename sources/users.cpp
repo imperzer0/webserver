@@ -14,9 +14,9 @@
 
 
 // Users: login, email, password
-static __user_map_t registered_users;
+static inline __user_map_t registered_users{};
 // Users who just created their account and need to verify their email address
-static __pending_user_map_t registered_users_pending;
+static inline __pending_user_map_t registered_users_pending{};
 
 
 const __user_map_t* get_registered_users()
@@ -41,6 +41,7 @@ bool load_users()
                 success = success && registered_users.insert({username, {email, password}}).second;
         }
         ::fclose(file);
+        MG_DEBUG(("[USERS] Success = %d", success));
         return success;
     }
     return false;
@@ -48,15 +49,13 @@ bool load_users()
 
 bool save_users()
 {
+    MG_DEBUG(("[USERS] Saving all users to file [" CONFIG_DIR "passwd" "]..."));
     FILE* file = ::fopen(CONFIG_DIR "passwd", "wb");
-    if (!file)
-        return false;
+    if (!file) return false;
     for (auto& reg_user : registered_users)
-        ::fprintf(
-            file, "%s : %s : %s\n",
-            reg_user.first.c_str(), reg_user.second.first.c_str(), reg_user.second.second.c_str()
-        );
+        ::fprintf(file, "%s : %s : %s\n", reg_user.first.c_str(), reg_user.second.first.c_str(), reg_user.second.second.c_str());
     ::fclose(file);
+    MG_DEBUG(("[USERS] Saved."));
     return true;
 }
 
@@ -64,6 +63,7 @@ bool save_users()
 bool add_new_user(const __user_map_t::value_type& user_data)
 {
     auto user = registered_users.insert(user_data);
+    MG_DEBUG(("Insert Success? = %d", user.second));
     return user.second && save_users();
 }
 

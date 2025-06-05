@@ -83,7 +83,7 @@ RUN openssl x509 -in /srv/certs/cert.pem -text -noout && \
 # Init Server config
 RUN [ "mkdir", "-p", "/etc/webserver/" ]
 RUN [ "chown", "-R", "webserver:webserver", "/etc/webserver/" ]
-RUN [ "chmod", "-R", "600", "/etc/webserver/" ]
+RUN [ "chmod", "-R", "700", "/etc/webserver/" ]
 
 ### RUN Configuration ###
 USER webserver
