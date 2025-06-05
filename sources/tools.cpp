@@ -8,6 +8,7 @@
 
 #include "tools.h"
 
+#include <cstring>
 #include <ftw.h>
 #include <pthread.h>
 #include <linux/limits.h>
@@ -70,12 +71,12 @@ std::string getcwd()
 }
 
 
-bool rm_rf(const char* path)
+bool rm_rf(const std::string& path)
 {
     struct stat st{};
-    if (stat(path, &st) < 0)
+    if (stat(path.c_str(), &st) < 0)
         return true;
-    return nftw(path, [](const char* fpath, const struct stat*, int, struct FTW*) -> int
+    return nftw(path.c_str(), [](const char* fpath, const struct stat*, int, struct FTW*) -> int
     {
         int rv = remove(fpath);
         if (rv) perror(fpath);
@@ -84,10 +85,10 @@ bool rm_rf(const char* path)
 }
 
 
-bool mkdir_p(const char* path)
+bool mkdir_p(const std::string& path)
 {
     struct stat st{};
-    if (stat(path, &st) == 0)
+    if (stat(path.c_str(), &st) == 0)
     {
         if (S_ISDIR(st.st_mode))
             return true;
@@ -98,7 +99,7 @@ bool mkdir_p(const char* path)
     char* p = nullptr;
     size_t len;
 
-    snprintf(tmp, sizeof(tmp), "%s", path);
+    snprintf(tmp, sizeof(tmp), "%s", path.c_str());
     len = strlen(tmp);
     if (tmp[len - 1] == '/')
         tmp[len - 1] = 0;
@@ -137,7 +138,7 @@ std::string path_basename(std::string path)
     return std::move(path.substr(slash + 1));
 }
 
-std::string read_all(const std::string& file)
+std::string FILE_read_all(const std::string& file)
 {
     FILE* f = fopen(file.c_str(), "rb");
     if (!f) return "";

@@ -4,7 +4,7 @@
 /// This file has functions that define the server
 
 #include "constants.h"
-#include "config.h"
+#include "settings.h"
 #include "server.h"
 #include "../mongoose/mongoose.c"
 #include "../strscan/strscan.c"
@@ -112,7 +112,7 @@ inline void handle_resources_html(struct mg_connection* connection, struct mg_ht
 /// Add path handler to global linked list
 void register_path_handler(const std::string& path, const std::string& description, path_handler_function fn)
 {
-    MG_INFO(("Registering '%s' => '%s' path...", description.c_str(), path.c_str()));
+    MG_DEBUG(("Registering '%s' => '%s' path...", description.c_str(), path.c_str()));
     if (!handlers_head)
     {
         // If no entries - create one
@@ -141,7 +141,7 @@ void register_path_handler(const std::string& path, const std::string& descripti
 /// Iterate through registered handlers_start and try handle them
 inline void handle_registered_paths(struct mg_connection* connection, struct mg_http_message* msg)
 {
-    MG_INFO(("Handling non-builtin registered paths..."));
+    MG_DEBUG(("Handling non-builtin registered paths..."));
     registered_path_handlers* root = handlers_start;
 
     while (root && root->data)
@@ -153,7 +153,7 @@ inline void handle_registered_paths(struct mg_connection* connection, struct mg_
 
     if (root && root->data) // If found one
     {
-        MG_INFO(("Handling '%s' => '%s' path for IP %M...", root->data->description.c_str(), root->data->path_regex.c_str(),
+        MG_DEBUG(("Handling '%s' => '%s' path for IP %M...", root->data->description.c_str(), root->data->path_regex.c_str(),
             mg_print_ip, &connection->rem));
         return root->data->fn(connection, msg); // Run the handler and quit after
     }
@@ -200,10 +200,18 @@ void client_handler(struct mg_connection* connection, int ev, void* ev_data)
         std::string key_path(stls_path); // Private Key
         key_path += "key.pem";
 
+        MG_DEBUG(("Reading [%.*s]...", cert_path.size(), cert_path.c_str()));
+        std::string Cert_ = FILE_read_all(cert_path);
+        MG_DEBUG(("Read: { %.*s }", 15, Cert_.c_str()));
+
+        MG_DEBUG(("Reading [%.*s]...", key_path.size(), key_path.c_str()));
+        std::string Key_ = FILE_read_all(key_path);
+        MG_DEBUG(("Read: { %.*s }", 15, Key_.c_str()));
+
         // Make a structure to pass to mongoose
         struct mg_tls_opts opts = {
-            .cert = mg_str(cert_path.c_str()),
-            .key = mg_str(key_path.c_str()),
+            .cert = mg_str(Cert_.c_str()),
+            .key = mg_str(Key_.c_str()),
         };
         mg_tls_init(connection, &opts); // Initialize TLS Connection
     }
@@ -272,7 +280,7 @@ void server_initialize()
         )
             {
                 mutex_locker l(&ftp_callback_mutex); // Async
-                MG_INFO((" [FTP] %s %s", ftp_command.c_str(), parameters.c_str()));
+                MG_DEBUG((" [FTP] %s %s", ftp_command.c_str(), parameters.c_str()));
             }
         );
     }
@@ -282,15 +290,14 @@ void server_initialize()
     register_additional_handlers(); // from config.cpp
 
     // Anonymous user can view everyone's files, but not edit
-    MG_INFO(("[FTP] Adding anonymous user to ftp server..."));
+    MG_DEBUG(("[FTP] Adding anonymous user to ftp server..."));
     ftp_server.addUserAnonymous(getcwd(), fineftp::Permission::ReadOnly);
 #endif
 
-    MG_INFO(("[USERS] Loading users from file..."));
     load_users();
 
 #ifdef ENABLE_FILESYSTEM_ACCESS
-    MG_INFO(("[FTP] Forwarding users to ftp server..."));
+    MG_DEBUG(("[FTP] Forwarding users to ftp server..."));
     forward_users(ftp_server);
 #endif
 }
@@ -368,7 +375,7 @@ void server_run()
 
 inline void handle_index_html(struct mg_connection* connection, struct mg_http_message* msg)
 {
-    MG_INFO(("Serving index.html to %M...", mg_print_ip, &connection->rem));
+    MG_DEBUG(("Serving index.html to %M...", mg_print_ip, &connection->rem));
 
     std::string list_html;
 #ifdef ENABLE_FILESYSTEM_ACCESS // if filesystem is enabled
@@ -379,7 +386,7 @@ inline void handle_index_html(struct mg_connection* connection, struct mg_http_m
     for (auto* i = handlers_start; i != nullptr && i->data != nullptr; i = i->next)
     {
         list_html += "<li><a href=\"" + i->data->path_regex + "\">" + i->data->description + "</a></li>\n";
-        MG_INFO(("Indexed '%s' => '%s'.", i->data->description.c_str(), i->data->path_regex.c_str()));
+        MG_DEBUG(("Indexed '%s' => '%s'.", i->data->description.c_str(), i->data->path_regex.c_str()));
     }
 
     // Add it to the article
@@ -396,7 +403,7 @@ inline void handle_index_html(struct mg_connection* connection, struct mg_http_m
 
 inline void handle_favicon_ico(struct mg_connection* connection, struct mg_http_message* msg)
 {
-    MG_INFO(("Serving favicon.ico to %M...", mg_print_ip, &connection->rem));
+    MG_DEBUG(("Serving favicon.ico to %M...", mg_print_ip, &connection->rem));
     // Send...
     http_send_resource(connection, msg, RESOURCE(favicon_ico), LEN(favicon_ico), "image/x-icon");
 }
@@ -514,7 +521,7 @@ void serve_dir(struct mg_connection* c, struct mg_http_message* hm, const struct
 
 inline void handle_dir_html(struct mg_connection* connection, struct mg_http_message* msg)
 {
-    MG_INFO(("Serving /dir/ to %M...", mg_print_ip, &connection->rem));
+    MG_DEBUG(("Serving /dir/ to %M...", mg_print_ip, &connection->rem));
     char* path = nullptr;
     auto cwd = getcwd(); // Current Working Directory
 
@@ -577,14 +584,14 @@ inline void handle_dir_html(struct mg_connection* connection, struct mg_http_mes
 
 inline void handle_register_form_html(struct mg_connection* connection, struct mg_http_message* msg)
 {
-    MG_INFO(("Serving /register-form to %M...", mg_print_ip, &connection->rem));
+    MG_DEBUG(("Serving /register-form to %M...", mg_print_ip, &connection->rem));
     mg_http_reply(connection, 200, "Content-Type: text/html\r\n", RESOURCE(register_html));
 }
 
 
 inline void send_verification_notification_page_html(struct mg_connection* connection)
 {
-    MG_INFO(("Sending email verification page to %M...", mg_print_ip, &connection->rem));
+    MG_DEBUG(("Sending email verification page to %M...", mg_print_ip, &connection->rem));
     mg_http_reply(connection, 200, "Content-Type: text/html\r\n", RESOURCE(verify_html));
 }
 
@@ -676,7 +683,7 @@ inline id_t generate_id_and_send_email(struct mg_connection* connection, struct 
         "To verify your email account and complete the registration process open link " + link +
         " in any available web browser.";
 
-    MG_INFO(("Sending link [%s] to [%s]", link.c_str(), email.c_str()));
+    MG_DEBUG(("Sending link [%s] to [%s]", link.c_str(), email.c_str()));
 
     struct curl_slist* recipients = nullptr;
     curl_easy_setopt(curl, CURLOPT_MAIL_FROM, server_verification_email);
@@ -706,7 +713,7 @@ inline id_t generate_id_and_send_email(struct mg_connection* connection, struct 
 
 inline void handle_register_html(struct mg_connection* connection, struct mg_http_message* msg)
 {
-    MG_INFO(("Processing registration request from %M...", mg_print_ip, &connection->rem));
+    MG_DEBUG(("Processing registration request from %M...", mg_print_ip, &connection->rem));
     if (mg_strcmp(msg->method, mg_str("POST")))
     {
         MG_ERROR(("Error parsing request: Invalid method: [%.*s]", _PRINT(msg->method)));
@@ -789,7 +796,7 @@ inline void handle_verify_html(struct mg_connection* connection, struct mg_http_
         return;
     }
 
-    MG_INFO(("Processing verification request from %M...", mg_print_ip, &connection->rem));
+    MG_DEBUG(("Processing verification request from %M...", mg_print_ip, &connection->rem));
     if (mg_strcmp(msg->method, mg_str("GET")))
     {
         MG_ERROR(("Error parsing request: Invalid method: [%.*s]", _PRINT(msg->method)));
@@ -839,7 +846,7 @@ inline void handle_verify_html(struct mg_connection* connection, struct mg_http_
 
 inline void handle_resources_html(struct mg_connection* connection, struct mg_http_message* msg)
 {
-    MG_INFO(("Processing /resources/ for %M...", mg_print_ip, &connection->rem));
+    MG_DEBUG(("Processing /resources/ for %M...", mg_print_ip, &connection->rem));
 
     char* path = nullptr;
 
@@ -967,7 +974,7 @@ inline void http_send_resource(struct mg_connection* connection, struct mg_http_
 
 inline void send_error_html(struct mg_connection* connection, int code, const char* color, const char* msg)
 {
-    MG_INFO(("Sending error message: Error %d \"%s\"...", code, msg));
+    MG_DEBUG(("Sending error message: Error %d \"%s\"...", code, msg));
     mg_http_reply(
         connection, code, "Content-Type: text/html\r\n", RESOURCE(error_html),
         color, color, color, color, code, mg_http_status_code_str(code), msg
