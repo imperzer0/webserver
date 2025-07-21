@@ -9,8 +9,8 @@ pkgdir="$(pwd)/$pkgname"
 srcdir="$(pwd)/src"
 
 
-init_dirs() {
-  echo "-> init_dirs($pkgname) in $(pwd)"
+MAKEPKG_init_dirs() {
+  echo "-> MAKEPKG_init_dirs($pkgname) in $(pwd)"
 
   rm -rfv "$srcdir" && echo "Removed old source directory" || exit 1;
   rm -rfv "$pkgdir" && echo "Removed old package directory" || exit 1;
@@ -20,15 +20,15 @@ init_dirs() {
   cd "$srcdir" || exit 1;
 }
 
-download_sources() {
-  echo "-> download_sources($pkgname:$srcdir) $(pwd)"
+MAKEPKG_download_sources() {
+  echo "-> MAKEPKG_download_sources($pkgname:$srcdir) $(pwd)"
 
   curl -LO "$url" || exit 2;
   tar -xvf "v$pkgver.tar.gz" -C "$srcdir/." || exit 2;
 }
 
-copy_files() {
-  echo "-> copy_files($pkgname) in $(pwd)"
+MAKEPKG_copy_files() {
+  echo "-> MAKEPKG_copy_files($pkgname) in $(pwd)"
 
   _srcprefix="../.."
 
@@ -61,14 +61,14 @@ copy_files() {
   cp -rfv "$srcdir/ftp_event_handler.h" "$srcdir/$pkgname-$pkgver/fineftp-server/src/"
 }
 
-install_deps() {
-  echo "-> install_deps($pkgname)"
+MAKEPKG_install_deps() {
+  echo "-> MAKEPKG_install_deps($pkgname)"
   sudo apt install -y "${makedepends[*]}" || exit 10;
   sudo apt-mark auto "${makedepends[*]}";
 }
 
-build() {
-  echo "-> build($pkgname) in $(pwd)"
+MAKEPKG_build() {
+  echo "-> MAKEPKG_build($pkgname) in $(pwd)"
 
   _cwd="$(pwd)"
 
@@ -82,8 +82,8 @@ build() {
   cd "$_cwd" || exit 6;
 }
 
-package() {
-  echo "-> package($pkgname-$pkgver) in $(pwd)"
+MAKEPKG_package() {
+  echo "-> MAKEPKG_package($pkgname-$pkgver) in $(pwd)"
 
   _cwd="$(pwd)"
 
@@ -95,7 +95,8 @@ package() {
   cd "$_cwd" || exit 7;
 }
 
-create_control_file() {
+MAKEPKG_create_control_file() {
+  echo "-> MAKEPKG_create_control_file($pkgdir) in $(pwd)"
   mkdir -p "$pkgdir/DEBIAN"
   cat <<EOF > "$pkgdir/DEBIAN/control"
 Package: $pkgname
@@ -109,19 +110,19 @@ Description: 📦 C++ FTP Server Library for Windows 🪟, Linux 🐧 & more �
 EOF
 }
 
-dpkg_build() {
-  echo "-> dpkg_build($pkgname) in $(pwd)"
+MAKEPKG_dpkg_build() {
+  echo "-> MAKEPKG_dpkg_build($pkgname) in $(pwd)"
 
   cd ..
-  dpkg-deb --verbose --build "./$pkgname" || exit 8;
+  dpkg-deb --verbose --root-owner-group --build "./$pkgname" || exit 8;
 }
 
 
-init_dirs;
-download_sources;
-copy_files;
-install_deps;
-build;
-package;
-create_control_file;
-dpkg_build;
+MAKEPKG_init_dirs;
+MAKEPKG_download_sources;
+MAKEPKG_copy_files;
+MAKEPKG_install_deps;
+MAKEPKG_build;
+MAKEPKG_package;
+MAKEPKG_create_control_file;
+MAKEPKG_dpkg_build;

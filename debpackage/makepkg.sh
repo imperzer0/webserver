@@ -152,7 +152,7 @@ MAKEPKG_dpkg_build() {
   echo "-> MAKEPKG_dpkg_build($pkgname) in $(pwd)"
 
   cd ..
-  dpkg-deb --verbose --build "./$pkgname" || exit 8;
+  dpkg-deb --verbose --root-owner-group --build "./$pkgname" || exit 8;
 }
 
 
