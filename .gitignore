@@ -13,3 +13,8 @@
 /debpackage/*
 # except
 !/debpackage/makepkg.sh
+
+# All
+/ftp/debpackage/*
+# except
+!/ftp/debpackage/makepkg.sh
