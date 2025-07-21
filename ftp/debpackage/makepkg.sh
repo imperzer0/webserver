@@ -1,6 +1,6 @@
 #!/bin/bash
 pkgname=fineftp-server
-pkgver=1.3.5
+pkgver=1.4.1
 url="https://github.com/eclipse-ecal/fineftp-server/archive/v$pkgver.tar.gz"
 makedepends=('libasio-dev')
 
