@@ -56,6 +56,8 @@ RUN [ "chmod", "744", "/srv/webserver/" ]
 
 #      http  https  ftp
 EXPOSE 80    443    21
+# FTP Passive Mode Ports
+EXPOSE 51480-52480
 
 # Create Certificates in /srv/certs/
 RUN [ "mkdir", "-p", "/srv/certs/" ]
@@ -90,4 +92,4 @@ USER webserver
 WORKDIR /srv/webserver/
 
 ENTRYPOINT ["/bin/webserver", "--tls", "/srv/certs/"]
-CMD []
+CMD ["--loglevel", "4"]

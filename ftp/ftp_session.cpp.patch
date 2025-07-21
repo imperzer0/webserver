@@ -1,16 +1,60 @@
-@@ -9,6 +9,7 @@
+--- ftp_session.cpp	2025-04-03 14:44:47.000000000 +0200
++++ ftp_session_mod.cpp	2025-07-21 11:07:24.106816406 +0200
+@@ -19,6 +19,7 @@
+ #include <string>
+ #include <sys/types.h>
+ #include <vector>
++#include <random>
  
+ #include <file_man.h>
  
- #include "filesystem.h"
-+#include "custom_event_handler.hpp"
+@@ -27,6 +28,8 @@
+ #include "user_database.h"
+ #include <fineftp/permissions.h>
+ 
++#include "ftp_event_handler.cpp"
++
+ #include <sys/stat.h>
  
  #ifdef WIN32
- #include <direct.h>
-@@ -218,6 +219,7 @@ namespace fineftp
-     auto command_it = command_map.find(ftp_command);
-     if (command_it != command_map.end())
-     {
-+      execute_custom_ftp_handlers(ftp_command, parameters, ftp_working_directory_, logged_in_user_);
-       command_it->second(parameters);
-       last_command_ = ftp_command;
+@@ -116,6 +119,7 @@
+ 
+   void FtpSession::sendRawFtpMessage(const std::string& raw_message)
+   {
++    ftp_injected<on_send_fn>::$()(raw_message);
+     asio::post(command_strand_, [me = shared_from_this(), raw_message]()
+                          {
+                            const bool write_in_progress = !me->command_output_queue_.empty();
+@@ -210,6 +214,8 @@
+                           me->output_ << "FTP << " << packet_string << std::endl;
+ #endif
+ 
++                          ftp_injected<on_receive_fn>::$()(packet_string);
++
+                           me->handleFtpCommand(packet_string);
+                         }));
+   }
+@@ -229,6 +235,7 @@
+       parameters = command.substr(space_index + 1, std::string::npos);
      }
+ 
++    ftp_injected<on_process_fn>::$()(ftp_command, parameters, ftp_working_directory_, logged_in_user_);
+ 
+     const std::map<std::string, std::function<void(std::string)>> command_map {
+       // Access control commands
+@@ -425,7 +432,14 @@
+       }
+     }
+ 
+-    const asio::ip::tcp::endpoint endpoint(asio::ip::tcp::v4(), 0);
++    // Create a random number generator
++    std::random_device rd;  // Obtain a random number from hardware
++    std::mt19937 eng(rd()); // Seed the generator
++
++    // Define the range for the port number
++    std::uniform_int_distribution<> distr(51480, 52480); // Define the range [51480, 52480]
++
++    const asio::ip::tcp::endpoint endpoint(asio::ip::tcp::v4(), distr(eng));
+ 
+     {
+       asio::error_code ec;

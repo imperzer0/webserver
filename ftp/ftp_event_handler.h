@@ -8,21 +8,41 @@
 #include <memory>
 #include "ftp_user.h"
 
+typedef void (*on_send_fn)(const std::string& raw_message);
+typedef void (*on_receive_fn)(const std::string& packet_string);
+typedef void (*on_process_fn)(
+        const std::string& ftp_command, const std::string& parameters,
+        const std::string& ftp_working_directory, std::shared_ptr<::fineftp::FtpUser> ftp_user
+    );
 
-typedef void
-(* ftp_event_handler_function)(
-		const std::string& ftp_command, const std::string& parameters, const std::string& ftp_working_directory,
-		std::shared_ptr<::fineftp::FtpUser> ftp_user
-);
-
-typedef struct event_handler
+template <typename Fn_>
+class ftp_injected
 {
-	struct event_handler* next = nullptr;
-	ftp_event_handler_function handler = nullptr;
-} event_handler;
+public:
+    static ftp_injected& $();
 
-extern event_handler* ftp_handlers;
+    template <typename... Args>
+    void operator()(Args... args);
 
-extern void add_custom_ftp_handler(ftp_event_handler_function handler);
+    template <typename... Args>
+    void call_this_one(Args... args);
+
+    void add(Fn_ fn);
+
+protected:
+    ftp_injected();
+    ftp_injected(Fn_ fn);
+
+private:
+    static ftp_injected* _this;
+
+    ftp_injected* next = nullptr;
+    ftp_injected* end = this;
+    Fn_ handler = nullptr;
+};
+
+/// Promise TU to generate classes later
+extern template class ftp_injected<on_send_fn>; // on_receive is the same
+extern template class ftp_injected<on_process_fn>;
 
 #endif //FINEFTP_SERVER_FTP_EVENT_HANDLER_H

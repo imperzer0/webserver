@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.23)
 project(webserver CXX)
 
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 23)
 
 find_package(OpenSSL REQUIRED)
 
@@ -79,7 +79,6 @@ add_executable(webserver
         sources/server.cpp
         sources/settings.cpp
         sources/tools.cpp
-        sources/users.cpp
-        sources/users.h)
+        sources/users.cpp)
 
 target_link_libraries(webserver pthread OpenSSL::SSL OpenSSL::Crypto fineftp-server curl)
