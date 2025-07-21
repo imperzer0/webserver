@@ -7,6 +7,7 @@ services:
       - "1480:80"
       - "1443:443"
       - "1421:21"
+      - "51480-52480:51480-52480"
     volumes:
       - webserver_data:/srv/webserver/
       - webserver_conf:/etc/webserver/
