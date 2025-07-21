@@ -34,7 +34,7 @@ MAKEPKG_copy_files() {
 
   source=(
     "Findasio.cmake.patch"
-    "custom_event_handler.hpp"
+    "ftp_event_handler.cpp"
     "ftp_event_handler.h"
     "ftp_session.cpp.patch"
   )
@@ -43,21 +43,9 @@ MAKEPKG_copy_files() {
     cp -rfv "$_srcprefix/$_src" "$srcdir";
   done
 
-  sha512sums=(
-    '5a157af2c9cf573c2649ffecc99edba86383985c5adaba2ad318098c2709e907147c8ce5c359d423b04e60f237e37c3f81d59daaa0a4a7146245e668aa801865'
-    '4262b909af0ce27715912628912514c01c3a118927ee7183570d020a3a18a4bd36f2c21f49bec8c52e670d703f54f51d666d6b3e8b52d662efeebe18c4448645'
-    'a76159c89448dbeed3c851ff77878db4b9fec3d69bf4929a244753751297b6a28e21f3ed483d903366b64ac2c08c852fa467197faec8b2c830f842467d596f9d'
-    'd2b4ee65af0cefacec0558943102276730fd14db4cfd0095579809aaa3136dd3e7dbb634ff7847bad09ee205c06d0b6b64b0d9345155eb8619960e1f8d3b7636'
-  )
-
-  for i in ${!source[*]}; do
-    echo -n "Checking sha512sum: ";
-    echo "${sha512sums[i]} $srcdir/${source[i]}" | sha512sum --check || exit 3;
-  done
-
-  patch --forward --strip=1 --input="Findasio.cmake.patch" "$pkgname-$pkgver/cmake/Findasio.cmake"
+  patch --forward --strip=1 --input="Findasio.cmake.patch" "$pkgname-$pkgver/thirdparty/asio-module/Findasio.cmake"
   patch --forward --strip=1 --input="$srcdir/ftp_session.cpp.patch" "$srcdir/$pkgname-$pkgver/fineftp-server/src/ftp_session.cpp"
-  cp -rfv "$srcdir/custom_event_handler.hpp" "$srcdir/$pkgname-$pkgver/fineftp-server/src/"
+  cp -rfv "$srcdir/ftp_event_handler.cpp" "$srcdir/$pkgname-$pkgver/fineftp-server/src/"
   cp -rfv "$srcdir/ftp_event_handler.h" "$srcdir/$pkgname-$pkgver/fineftp-server/src/"
 }
 

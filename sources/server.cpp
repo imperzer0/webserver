@@ -272,17 +272,18 @@ void server_initialize()
 #ifdef ENABLE_FILESYSTEM_ACCESS
     if (log_level >= MG_LL_INFO)
     {
-        // Print all ftp commands in logs
-        add_custom_ftp_handler(
-            [](
-            const std::string& ftp_command, const std::string& parameters, const std::string& ftp_working_directory,
-            std::shared_ptr<::fineftp::FtpUser> ftp_user
-        )
-            {
-                mutex_locker l(&ftp_callback_mutex); // Async
-                MG_DEBUG((" [FTP] %s %s", ftp_command.c_str(), parameters.c_str()));
-            }
-        );
+        // Print all ftp commands received in logs
+        ftp_injected<on_send_fn>::$().add([](const std::string& raw_message)
+        {
+            mutex_locker l(&ftp_callback_mutex); // Async
+            MG_DEBUG((" [FTP] >> %.*s", raw_message.size(), raw_message.c_str()));
+        });
+        // Print all ftp replies in logs
+        ftp_injected<on_receive_fn>::$().add([](const std::string& raw_message)
+        {
+            mutex_locker l(&ftp_callback_mutex); // Async
+            MG_DEBUG((" [FTP] << %.*s", raw_message.size(), raw_message.c_str()));
+        });
     }
 #endif
 
