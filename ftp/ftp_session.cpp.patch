@@ -1,23 +1,17 @@
---- ftp_session.cpp	2025-04-03 14:44:47.000000000 +0200
-+++ ftp_session_mod.cpp	2025-07-21 11:07:24.106816406 +0200
-@@ -19,6 +19,7 @@
- #include <string>
- #include <sys/types.h>
- #include <vector>
-+#include <random>
+diff --git a/ftp_session.copy.cpp b/ftp_session.cpp
+index 16d50d1..799f249 100755
+--- a/ftp_session.copy.cpp
++++ b/ftp_session.cpp
+@@ -24,6 +24,8 @@
  
  #include <file_man.h>
  
-@@ -27,6 +28,8 @@
- #include "user_database.h"
- #include <fineftp/permissions.h>
- 
 +#include "ftp_event_handler.cpp"
 +
- #include <sys/stat.h>
- 
- #ifdef WIN32
-@@ -116,6 +119,7 @@
+ #include "filesystem.h"
+ #include "ftp_message.h"
+ #include "user_database.h"
+@@ -120,6 +122,7 @@ namespace fineftp
  
    void FtpSession::sendRawFtpMessage(const std::string& raw_message)
    {
@@ -25,24 +19,24 @@
      asio::post(command_strand_, [me = shared_from_this(), raw_message]()
                           {
                             const bool write_in_progress = !me->command_output_queue_.empty();
-@@ -210,6 +214,8 @@
+@@ -213,6 +216,7 @@ namespace fineftp
+ #ifndef NDEBUG
                            me->output_ << "FTP << " << packet_string << std::endl;
  #endif
- 
 +                          ftp_injected<on_receive_fn>::$()(packet_string);
-+
+ 
                            me->handleFtpCommand(packet_string);
                          }));
-   }
-@@ -229,6 +235,7 @@
-       parameters = command.substr(space_index + 1, std::string::npos);
+@@ -291,6 +295,8 @@ namespace fineftp
+       sendFtpMessage(FtpReplyCode::SYNTAX_ERROR_UNRECOGNIZED_COMMAND, "Unrecognized command");
      }
  
 +    ftp_injected<on_process_fn>::$()(ftp_command, parameters, ftp_working_directory_, logged_in_user_);
- 
-     const std::map<std::string, std::function<void(std::string)>> command_map {
-       // Access control commands
-@@ -425,7 +432,14 @@
++
+     // Wait for next command
+     if (!shutdown_requested_)
+     {
+@@ -430,7 +436,14 @@ namespace fineftp
        }
      }
  

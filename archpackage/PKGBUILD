@@ -1,0 +1,138 @@
+#!/bin/bash
+# Maintained by imperzer0 <dmytroperets@gmail.com>
+
+pkgname=webserver
+pkgver=2.11
+pkgrel=0
+pkgdesc='Lightweight c++ web server for linux with ftp'
+author="imperzer0"
+arch=('any')
+url=https://github.com/$author/$pkgname
+license=('GPL3')
+depends=('openssl' 'gcc' 'curl')
+makedepends=('cmake' 'git' 'gcc' 'make' 'openssl' 'curl')
+
+mongoose_pkgver="7.12"
+
+_srcprefix="file://$(pwd)"
+_libfiles=(
+  "main.cpp"
+  "server.cpp"
+  "server.h"
+  "constants.h"
+  "tools.cpp"
+  "tools.h"
+  "settings.cpp"
+  "settings.h"
+  "users.cpp"
+  "users.h"
+)
+
+_rcfiles=(
+  "article.html"
+  "bootstrap.css"
+  "dashboard.html"
+  "error.html"
+  "index.html"
+  "register.html"
+  "verify.html"
+)
+
+_ftpfiles=(
+  "Findasio.cmake.patch"
+  "ftp_event_handler.cpp"
+  "ftp_event_handler.h"
+  "ftp_session.cpp.patch"
+  "ftp_user.h"
+  "PKGBUILD.fineftp"
+)
+
+source=(${source[@]} "$_srcprefix/CMakeLists.txt")
+sha512sums=(${sha512sums[@]} "SKIP")
+
+# shellcheck disable=SC2068
+for _libfile in ${_libfiles[@]}; do
+  source=(${source[@]} "$_srcprefix/sources/$_libfile")
+  sha512sums=(${sha512sums[@]} "SKIP")
+done
+
+# shellcheck disable=SC2068
+for _rcfile in ${_rcfiles[@]}; do
+  source=(${source[@]} "$_srcprefix/resources/$_rcfile")
+  sha512sums=(${sha512sums[@]} "SKIP")
+done
+
+# shellcheck disable=SC2068
+for _ftpfile in ${_ftpfiles[@]}; do
+  source=(${source[@]} "$_srcprefix/ftp/$_ftpfile")
+  sha512sums=(${sha512sums[@]} "SKIP")
+done
+
+source=(${source[@]} "$_srcprefix/resources/favicon.ico")
+_rcfiles=(${_rcfiles[@]} "favicon.ico")
+sha512sums=(${sha512sums[@]} "72850225ffda45dff7f87645e80512ddce302fec175df7adb0e6d8d91f5f5a2131250fe91510b35f19cf05c1d229aa9eb8f71594c918555acb0418f3c2975cff")
+
+source=(${source[@]} "$_srcprefix/resources/CascadiaMono.woff")
+_rcfiles=(${_rcfiles[@]} "CascadiaMono.woff")
+sha512sums=(${sha512sums[@]} "180d3248b16d5d3ed3aca598eb67e7edb8ec8553c21edafe96d9d268989c0d7896a615c7e67527d1fca913308e1b24a363a59c7826b7e341012e853736db4fa6")
+
+
+external=(${external[@]} "https://raw.githubusercontent.com/cesanta/mongoose/$mongoose_pkgver/mongoose.c")
+sha512sums=(${sha512sums[@]} "344192988525bca828254e50ad06ab5f31abc55fe40088787e49480e26276fc6ae675d729477ab382ab63d55c1af114e590408add4ed98738c43490810b7d5f0")
+
+external=(${external[@]} "https://raw.githubusercontent.com/cesanta/mongoose/$mongoose_pkgver/mongoose.h")
+sha512sums=(${sha512sums[@]} "bdba75930f6cde1a005102ef8add3a99ab1d208b87c112ade69537d09f73e5c933777891168d509e3d9d142ee03c9d277933adc12293edba2ef02a0573ec5ec6")
+
+external=(${external[@]} "https://raw.githubusercontent.com/imperzer0/strscan/6dab57b46952171286cffd3f4e15c0a7f1b8704d/strscan.c")
+sha512sums=(${sha512sums[@]} "3c342a5706e6a0fcc54493343646dc5e97a9f19ff34c95c1f829791592e1f94132bfd0155f49447219c4b20042f00d1ff64f9ff83256eb819b8c023f1e224527")
+
+external=(${external[@]} "https://raw.githubusercontent.com/imperzer0/strscan/6dab57b46952171286cffd3f4e15c0a7f1b8704d/strscan.h")
+sha512sums=(${sha512sums[@]} "235b69b020345d492193eb409df41b57ed6a2c82aa3598755a6b00f411e2f7a7a3f1a0ba6dccaec22a5f0b2dd230157d61e7fd008e0ca3eddfc318fb8c4d3a06")
+
+source=(${source[@]} ${external[@]})
+
+_package_version=" ("$pkgver"-"$pkgrel")"
+
+prepare() {
+  mkdir sources
+  # shellcheck disable=SC2068
+  for _libfile in ${_libfiles[@]}; do
+    mv "$_libfile" "sources/$_libfile"
+  done
+
+  mkdir resources
+  # shellcheck disable=SC2068
+  for _rcfile in ${_rcfiles[@]}; do
+    mv "$_rcfile" "resources/$_rcfile"
+  done
+
+  mkdir ftp
+  # shellcheck disable=SC2068
+  for _ftpfile in ${_ftpfiles[@]}; do
+    mv "$_ftpfile" "ftp/$_ftpfile"
+  done
+
+  mkdir mongoose;
+  for _mgfile in 'mongoose.c' 'mongoose.h'; do
+    mv "$_mgfile" "mongoose/$_mgfile"
+  done
+
+  mkdir strscan;
+  for _sscfile in 'strscan.c' 'strscan.h'; do
+    mv "$_sscfile" "strscan/$_sscfile"
+  done
+
+
+  cd ftp
+  makepkg -sif --noconfirm -p PKGBUILD.fineftp
+}
+
+build() {
+  cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++ \
+    -DPACKAGE_VERSION="$_package_version" -DAPPNAME="$pkgname" .
+  make -j 8
+}
+
+package() {
+  install -Dm755 $pkgname "$pkgdir/usr/bin/$pkgname"
+}

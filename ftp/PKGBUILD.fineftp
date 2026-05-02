@@ -1,0 +1,59 @@
+#!/bin/bash
+# Maintained by imper <dmytroperets@gmail.com>
+
+pkgname=fineftp-server
+pkgver=1.6.0
+pkgrel=1
+pkgdesc="FineFTP is a minimal FTP server library for Windows and Unix flavors"
+arch=('any')
+url="https://github.com/eclipse-ecal/fineftp-server"
+license=('MIT')
+depends=('gcc-libs' 'glibc')
+makedepends=('asio' 'cmake' 'gtest' 'curl')
+optdepends=()
+source=(
+  "$pkgname-$pkgver.tar.gz::https://github.com/eclipse-ecal/fineftp-server/archive/v$pkgver.tar.gz"
+  "Findasio.cmake.patch"
+  "ftp_event_handler.cpp"
+  "ftp_event_handler.h"
+  "ftp_session.cpp.patch"
+  "ftp_user.h"
+)
+sha512sums=(
+  'ce658369d3250c99e9e05f927711d73285218c39c7e923c2a9a28d93d76cfb1d3746d30a186769847ba423ea6285c99f0af432fa919a07377b81b43e1733ccbc'
+  '5a157af2c9cf573c2649ffecc99edba86383985c5adaba2ad318098c2709e907147c8ce5c359d423b04e60f237e37c3f81d59daaa0a4a7146245e668aa801865'
+  '370536dbb2e8a8a01c350ff18be9f9458fb88717eee92a8d4ea47ef716459530c3d13e30086f9b5668757afa4ec44505ed7456e7b8cd83ba81ece222851aa0e5'
+  'f406c38ed7b4a49868acc7e2cb10c5588e84539d74e8f936b08d742876ab2407578fd44c3c6557b8baf262ad548ab40d66aa6c47304a943445394b52c671d63e'
+  'a6ca1f205322997152b2ec9cdbfafb53ed291f941e0a13768a71f935e36435fbf39e4d671bcdb3494a721b279b173318b0df9a106e13aab7727fb7a5ba866ada'
+  'd967ab5edc272092a70e5f97cce575c903bddfa09bd8f04988eeafa8cb22a092889455c642365e4ede14e7ea5d4160cfe5b0af7bdc4e8820388c38e3557d7359'
+)
+
+prepare() {
+  patch --forward --strip=1 --input="Findasio.cmake.patch" "$pkgname-$pkgver/cmake/Findasio.cmake"
+  patch --forward --strip=1 --input="ftp_session.cpp.patch" "$pkgname-$pkgver/fineftp-server/src/ftp_session.cpp"
+  cp -fv "ftp_event_handler.cpp" "$pkgname-$pkgver/fineftp-server/src/"
+  cp -fv "ftp_event_handler.h" "$pkgname-$pkgver/fineftp-server/src/"
+}
+
+build() {
+  local cmake_options=(
+  		-S "$pkgname-$pkgver"
+  		-B build
+  		-DCMAKE_BUILD_TYPE=Release
+  		-DCMAKE_INSTALL_PREFIX=/usr
+  		-DBUILD_SHARED_LIBS=ON
+  		-DFINEFTP_SERVER_BUILD_SAMPLES=OFF
+  		-DFINEFTP_SERVER_BUILD_TESTS=ON
+  		-DFINEFTP_SERVER_USE_BUILTIN_ASIO=OFF
+  		-DFINEFTP_SERVER_USE_BUILTIN_GTEST=OFF
+  		-DCMAKE_MODULE_PATH="$(pwd)/$pkgname-$pkgver/thirdparty/asio-module"
+  		-Dasio_INCLUDE_DIR=/usr/include
+  	)
+  	cmake "${cmake_options[@]}"
+  	cmake --build build
+}
+
+package() {
+  install -Dm644 "$pkgname-$pkgver/LICENSE" "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+  DESTDIR="$pkgdir" cmake --install build
+}
