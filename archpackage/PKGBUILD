@@ -24,10 +24,6 @@ _libfiles=(
   "settings.h"
   "users.cpp"
   "users.h"
-  "mongoose.c"
-  "mongoose.h"
-  "strscan.c"
-  "strscan.h"
 )
 
 _rcfiles=(
@@ -67,6 +63,16 @@ done
 # shellcheck disable=SC2068
 for _ftpfile in ${_ftpfiles[@]}; do
   source=(${source[@]} "$_srcprefix/ftp/$_ftpfile")
+  sha512sums=(${sha512sums[@]} "SKIP")
+done
+
+for _mgfile in 'mongoose.c' 'mongoose.h'; do
+  source=(${source[@]} "$_srcprefix/$_mgfile")
+  sha512sums=(${sha512sums[@]} "SKIP")
+done
+
+for _sscfile in 'strscan.c' 'strscan.h'; do
+  source=(${source[@]} "$_srcprefix/$_sscfile")
   sha512sums=(${sha512sums[@]} "SKIP")
 done
 
