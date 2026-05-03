@@ -11,14 +11,22 @@ RUN pacman -Sy base-devel --noconfirm --needed
 RUN useradd -mg users -G wheel -s /bin/bash webserver
 RUN echo 'webserver ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
 
-# Create a build directory that our user has rights for
+# Create a build directory
 RUN mkdir -p /webserver/
-COPY * /webserver/
+# Copy everything
+COPY . /webserver/
+# Give webserver user permissions
 RUN chown webserver:users -R /webserver/
 
-# Build archlinux package
+# List what we got copied
 WORKDIR /webserver/
 RUN ls -alshp
+
+# Disable generating debug symbols with makepkg
+RUN [ "sed", "-i", "/^OPTIONS=/ s/debug/!debug/", "/etc/makepkg.conf" ]
+
+# Build archlinux package
+WORKDIR /webserver/archpackage/
 USER webserver
 RUN makepkg -sif --noconfirm
 
@@ -26,10 +34,15 @@ RUN makepkg -sif --noconfirm
 ### APP Container ###
 FROM archlinux AS app
 
+# Install core dependencies
+RUN pacman -Sy gcc --noconfirm --needed
+
 RUN mkdir -p /pack/
 # Copy our packages from build environment
-COPY --from=build /webserver/*.pkg.tar.zst /pack/
+COPY --from=build /webserver/archpackage/*.pkg.tar.zst /pack/
 WORKDIR /pack/
+RUN ls -alshp
+
 # Install them all
 RUN pacman -U *.pkg.tar.zst --noconfirm
 
