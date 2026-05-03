@@ -79,6 +79,8 @@ add_executable(webserver
         sources/server.cpp
         sources/settings.cpp
         sources/tools.cpp
-        sources/users.cpp)
+        sources/users.cpp
+        ftp/ftp_event_handler.cpp
+)
 
 target_link_libraries(webserver pthread OpenSSL::SSL OpenSSL::Crypto fineftp-server curl)
