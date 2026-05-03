@@ -104,7 +104,7 @@ inline void handle_register_form_html(struct mg_connection* connection, struct m
 inline void handle_register_html(struct mg_connection* connection, struct mg_http_message* msg);
 
 /// Handle user email verification request
-inline void handle_verify_html(struct mg_connection* connection, struct mg_http_message* msg);
+inline void handle_verify_html(struct mg_connection* connection, const struct mg_http_message* msg);
 
 /// Handle other resources request
 inline void handle_resources_html(struct mg_connection* connection, struct mg_http_message* msg);
@@ -308,7 +308,7 @@ void server_run()
 {
     if (http_address)
     {
-        if (!(http_server_connection = mg_http_listen(&manager, http_address, client_handler, nullptr)))
+        if (!((http_server_connection = mg_http_listen(&manager, http_address, client_handler, nullptr))))
         {
             MG_ERROR(("Could not start listening on '%s'. Use 'http://ADDR:PORT' or just ':PORT' as http(s) address parameter", http_address));
             exit(EXIT_FAILURE);
@@ -317,7 +317,7 @@ void server_run()
 
     if (tls_path && https_address)
     {
-        if (!(https_server_connection = mg_http_listen(&manager, https_address, client_handler, (void*)1)))
+        if (!((https_server_connection = mg_http_listen(&manager, https_address, client_handler, reinterpret_cast<void*>(1)))))
         {
             MG_ERROR(("Could not start listening on %s. Use 'https://ADDR:PORT' or just ':PORT' as https address parameter", https_address));
             https_server_connection = nullptr;
@@ -457,7 +457,7 @@ static void list_dir(
     char tmp[10], buf[MG_PATH_MAX];
     size_t off, n;
     int len = mg_url_decode(_EXPAND(hm->uri), buf, sizeof(buf), 0);
-    struct mg_str uri = len > 0 ? mg_str_n(buf, (size_t)len) : hm->uri;
+    struct mg_str uri = len > 0 ? mg_str_n(buf, static_cast<size_t>(len)) : hm->uri;
 
     mg_printf(
         c,
@@ -494,7 +494,7 @@ static void list_dir(
     fs->ls(dir, printdirentry, &d);
     mg_printf(c, "</tbody><tfoot><tr><td colspan=\"3\"><hr></td></tr></tfoot> </table></body></html>\n");
     // The purpose of the copy-paste is to remove <address>Mongoose v....</address> up here ^
-    n = mg_snprintf(tmp, sizeof(tmp), "%lu", (unsigned long)(c->send.len - off));
+    n = mg_snprintf(tmp, sizeof(tmp), "%lu", static_cast<unsigned long>(c->send.len - off));
     if (n > sizeof(tmp)) n = 0;
     memcpy(c->send.buf + off - 12, tmp, n); // Set content length
     c->is_resp = 0;                         // Mark response end
@@ -604,7 +604,7 @@ typedef struct
 // Callback function that provides the data for the email message
 static size_t curl_read_callback_email_data(void* buffer, size_t size, size_t nmemb, void* instream)
 {
-    auto* upload = (MessageData*)instream;
+    auto* upload = static_cast<MessageData*>(instream);
 
     if ((size == 0) || (nmemb == 0) || ((size * nmemb) < 1) || upload->pos >= upload->message.size()) return 0;
 
@@ -804,7 +804,7 @@ inline void handle_register_html(struct mg_connection* connection, struct mg_htt
 }
 
 
-inline void handle_verify_html(struct mg_connection* connection, struct mg_http_message* msg)
+inline void handle_verify_html(struct mg_connection* connection, const struct mg_http_message* msg)
 {
     if (server_verification_email == nullptr)
     {
@@ -945,7 +945,7 @@ inline void http_send_resource(
     {
         if (ev == MG_EV_WRITE || ev == MG_EV_POLL)
         {
-            auto rc = (str_buf_fd*)c->pfn_data;
+            auto rc = static_cast<str_buf_fd*>(c->pfn_data);
 
             // Read to send IO buffer directly, avoid extra on-stack buffer
             size_t max = MG_IO_SIZE, space;
@@ -961,7 +961,7 @@ inline void http_send_resource(
             *cl -= space;
             if (space == 0)
             {
-                delete (str_buf_fd*)c->pfn_data;
+                delete static_cast<str_buf_fd*>(c->pfn_data);
                 c->pfn_data = nullptr;
                 c->pfn = http_cb;
                 c->is_resp = 0;
@@ -969,7 +969,7 @@ inline void http_send_resource(
         }
         else if (ev == MG_EV_CLOSE)
         {
-            delete (str_buf_fd*)c->pfn_data;
+            delete static_cast<str_buf_fd*>(c->pfn_data);
             c->pfn_data = nullptr;
             c->pfn = http_cb;
             c->is_resp = 0;
