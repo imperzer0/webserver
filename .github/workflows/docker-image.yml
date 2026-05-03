@@ -15,4 +15,4 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v6
     - name: Build the Docker image
-      run: docker build . --file Dockerfile --tag my-image-name:$(date +%s)
+      run: docker build -t webserver:$(date +%s) . && docker image prune -f && docker compose up
