@@ -1,6 +1,5 @@
 **/.git/
 **/.idea/
-**/archpackage/
 **/cmake-build-*/
 **/.gitignore
 **/.gitmodules

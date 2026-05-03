@@ -2,51 +2,52 @@
 # Author: Perets Dmytro <dmytroperets@gmail.com>
 
 ### BUILD Container ###
-FROM debian:bookworm AS build
+FROM archlinux AS build
 
-# UPGRADE
-RUN [ "apt-get", "update", "--yes" ]
-RUN [ "apt-get", "upgrade", "--yes" ]
-# We need sudo for makepkg.sh
-RUN [ "apt-get", "install", "--yes", "sudo" ]
+# Install core dependencies
+RUN pacman -Sy base-devel --noconfirm --needed
 
-# And non-root user
-RUN [ "useradd", "-G", "sudo", "-s", "/bin/bash", "build" ]
-RUN echo '%sudo   ALL=(ALL:ALL) NOPASSWD:ALL' >> /etc/sudoers
+# Create a non-root user and give him root access
+RUN useradd -mg users -G wheel -s /bin/bash webserver
+RUN echo 'webserver ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
 
-# Build directory /webserver/
-RUN [ "mkdir", "-p", "/webserver/" ]
+# Create a build directory
+RUN mkdir -p /webserver/
+# Copy everything
 COPY . /webserver/
-RUN [ "chown", "-R", "build:build", "/webserver/" ]
+# Give webserver user permissions
+RUN chown webserver:users -R /webserver/
 
-# Run packaging script
-WORKDIR /webserver/debpackage/
-USER build
-RUN [ "bash", "makepkg.sh" ]
-RUN ls -lh *.deb
-RUN ls -lh src/ftp/debpackage/*.deb
+# List what we got copied
+WORKDIR /webserver/
+RUN ls -alshp
+
+# Disable generating debug symbols with makepkg
+RUN [ "sed", "-i", "/^OPTIONS=/ s/debug/!debug/", "/etc/makepkg.conf" ]
+
+# Build archlinux package
+WORKDIR /webserver/archpackage/
+USER webserver
+RUN makepkg -sif --noconfirm
 
 
 ### APP Container ###
-FROM debian:bookworm AS app
+FROM archlinux AS app
 
-# UPGRADE
-RUN [ "apt-get", "update", "--yes" ]
-RUN [ "apt-get", "upgrade", "--yes" ]
+# Install core dependencies
+RUN pacman -Sy gcc --noconfirm --needed
+
+RUN mkdir -p /pack/
+# Copy our packages from build environment
+COPY --from=build /webserver/archpackage/*.pkg.tar.zst /pack/
+WORKDIR /pack/
+RUN ls -alshp
+
+# Install them all
+RUN pacman -U *.pkg.tar.zst --noconfirm
 
 # Non-root user
 RUN [ "useradd", "-mG", "users", "-s", "/bin/bash", "webserver" ]
-
-# Copy built packages from 'build' container
-RUN [ "mkdir", "-p", "/pack/ftp/" ]
-COPY --from=build /webserver/debpackage/src/ftp/debpackage/*.deb /pack/ftp/
-COPY --from=build /webserver/debpackage/*.deb /pack/
-
-# Install packages
-WORKDIR /pack/
-RUN dpkg --unpack ftp/*.deb
-RUN dpkg --unpack *.deb
-RUN [ "apt-get", "install", "--yes", "--fix-broken" ]
 
 # Init Server root
 RUN [ "mkdir", "-p", "/srv/webserver/" ]
@@ -54,8 +55,9 @@ RUN [ "chown", "-R", "webserver:webserver", "/srv/webserver/" ]
 RUN [ "chmod", "-R", "644", "/srv/webserver/" ]
 RUN [ "chmod", "744", "/srv/webserver/" ]
 
-#      http  https  ftp
 EXPOSE 80    443    21
+#      http  https  ftp
+
 # FTP Passive Mode Ports
 EXPOSE 51480-52480
 
