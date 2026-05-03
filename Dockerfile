@@ -20,7 +20,7 @@ RUN chown webserver:users -R /webserver/
 
 # List what we got copied
 WORKDIR /webserver/
-RUN ls -alshp
+RUN ls -alshp *
 
 # Disable generating debug symbols with makepkg
 RUN [ "sed", "-i", "/^OPTIONS=/ s/debug/!debug/", "/etc/makepkg.conf" ]
